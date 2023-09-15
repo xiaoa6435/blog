@@ -1,0 +1,44 @@
+[
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "About",
+    "section": "",
+    "text": "About this blog"
+  },
+  {
+    "objectID": "posts/quantile-ab-test/index.html",
+    "href": "posts/quantile-ab-test/index.html",
+    "title": "A/B test中分位数指标的处理",
+    "section": "",
+    "text": "在A/B test，分位数指标主要见于两个场景：\n\napi服务/算法的性能问题: 比如新版本的页面加载时长，新算法的接口调用耗时等。这类指标通常都是严重偏态的，并且由于网络、设备等原因，经常会出现很大的极端值，或者删失值，传统上一般也是关注p90，p99(接口响应的第90/99分位值)等指标\n线上零工经济，这和计量经济学中分位数检验/回归的核心问题类似。比如，对滴滴/uber的派单/抽成策略实验的讨论中，我们不仅需要关注对司机平均收入的影响，还需要注意策略是否加剧了司机收入的不平等，这里就需要关注策略对司机收入的分位数的影响\n\n本文主要基于linkedin Liu et al. (2019) 的Large-Scale Online Experimentation with Quantile Metrics和Spotify Schultzberg and Ankargren (2022) 的Resampling-free bootstrap inference for quantiles，顺便也会提到和计量经济学的分位数回归的对比，来讨论A/B中分位数指标的处理。\n\nReferences\n\n\nLiu, Min, Xiaohui Sun, Maneesh Varshney, and Ya Xu. 2019. “Large-Scale Online Experimentation with Quantile Metrics.” arXiv Preprint arXiv:1903.08762.\n\n\nSchultzberg, Mårten, and Sebastian Ankargren. 2022. “Resampling-Free Bootstrap Inference for Quantiles.” In Proceedings of the Future Technologies Conference, 548–62. Springer."
+  },
+  {
+    "objectID": "posts/welcome/index.html",
+    "href": "posts/welcome/index.html",
+    "title": "Welcome To My Blog",
+    "section": "",
+    "text": "This is the first post in a Quarto blog. Welcome!\n\nSince this post doesn’t specify an explicit image, the first image in the post will be used in the listing page of posts."
+  },
+  {
+    "objectID": "posts/post-with-online-code/index.html",
+    "href": "posts/post-with-online-code/index.html",
+    "title": "Post With Code",
+    "section": "",
+    "text": "python -m pip install shinylive\nquarto add quarto-ext/shinylive\nquarto install tinytex # pdf"
+  },
+  {
+    "objectID": "posts/post-with-online-code/index.html#参考文献引用",
+    "href": "posts/post-with-online-code/index.html#参考文献引用",
+    "title": "Post With Code",
+    "section": "参考文献引用",
+    "text": "参考文献引用\n引用 Liu et al. (2019) 的文章\n\nReferences\n\n\nLiu, Min, Xiaohui Sun, Maneesh Varshney, and Ya Xu. 2019. “Large-Scale Online Experimentation with Quantile Metrics.” arXiv Preprint arXiv:1903.08762."
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "blog",
+    "section": "",
+    "text": "Post With Code\n\n\n\n\n\n\n\nnews\n\n\ncode\n\n\nanalysis\n\n\n\n\n\n\n\n\n\n\n\nSep 15, 2023\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\nA/B test中分位数指标的处理\n\n\n\n\n\n\n\nA/B test\n\n\nquantile test\n\n\n\n\n\n\n\n\n\n\n\nSep 15, 2023\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\nWelcome To My Blog\n\n\n\n\n\n\n\nnews\n\n\n\n\n\n\n\n\n\n\n\nSep 12, 2023\n\n\n张振昊\n\n\n\n\n\n\nNo matching items"
+  }
+]
