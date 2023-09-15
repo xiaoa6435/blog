@@ -3,6 +3,7 @@ title: "Post With Code"
 date: "2023-09-15"
 categories: [news, code, analysis]
 image: "image.jpg"
+bibliography: references.bib
 ---
 
 # setup
@@ -104,3 +105,14 @@ tinytex::install_tinytex()
 ```
 
 对pdf, 单行公式$$直接不要有空格
+
+
+## 参考文献引用
+
+引用 @liu2019large 的文章
+
+
+### References
+
+::: {#refs}
+:::
