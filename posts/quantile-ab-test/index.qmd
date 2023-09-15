@@ -1,0 +1,19 @@
+---
+title: "A/B test中分位数指标的处理"
+date: "2023-09-15"
+categories: [A/B test, quantile test]
+---
+
+在A/B test，分位数指标主要见于两个场景：
+
+- api服务/算法的性能问题: 比如新版本的页面加载时长，新算法的接口调用耗时等。这类指标通常都是严重偏态的，并且由于网络、设备等原因，经常会出现很大的极端值，或者删失值，传统上一般也是关注p90，p99(接口响应的第90/99分位值)等指标
+
+- 线上零工经济\双边平台的收入平等问题，这和计量经济学中分位数检验/回归的核心问题类似。比如，对滴滴/uber的派单/抽成策略实验的讨论中，我们不仅需要关注对司机平均收入的影响，还需要注意策略是否加剧了司机收入的不平等，这里就需要关注策略对司机收入的分位数的影响
+
+本文主要基于linkedin @liu2019large 的[Large-Scale Online Experimentation with Quantile Metrics](https://arxiv.org/pdf/1903.08762.pdf)和Spotify @schultzberg2022resampling 的[Resampling-free bootstrap inference for quantiles](https://arxiv.org/pdf/2202.10992.pdf)，顺便也会提到和计量经济学的分位数回归的对比，来讨论A/B中分位数指标的处理。
+
+
+### References
+
+::: {#refs}
+:::
