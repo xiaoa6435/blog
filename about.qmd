@@ -1,0 +1,16 @@
+---
+title: "About"
+image: profile.jpg
+about:
+  template: jolla
+  links:
+    - icon: stack-overflow
+      text: Cross Validated 
+      href: https://stats.stackexchange.com/users/347393/wei
+    - icon: github
+      text: Github
+      href: https://github.com/xiaoa6435
+
+---
+
+About this blog

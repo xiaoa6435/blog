@@ -1,0 +1,106 @@
+---
+title: "Post With Code"
+date: "2023-09-15"
+categories: [news, code, analysis]
+image: "image.jpg"
+---
+
+# setup
+
+```bash
+python -m pip install shinylive
+quarto add quarto-ext/shinylive
+quarto install tinytex # pdf
+```
+
+
+# shinylive-demo
+
+The plot below allows you to control parameters used in the sine function.
+Experiment with the _period_, _amplitude_, and _phase shift_ to see how they affect the graph.
+
+```{shinylive-python}
+#| standalone: true
+#| viewerHeight: 420
+
+from shiny import App, render, ui
+import numpy as np
+import matplotlib.pyplot as plt
+
+app_ui = ui.page_fluid(
+    ui.layout_sidebar(
+        ui.panel_sidebar(
+            ui.input_slider("period", "Period", 0.5, 2, 1, step=0.5),
+            ui.input_slider("amplitude", "Amplitude", 0, 2, 1, step=0.25),
+            ui.input_slider("shift", "Phase shift", 0, 2, 0, step=0.1),
+        ),
+        ui.panel_main(
+            ui.output_plot("plot"),
+        ),
+    ),
+)
+
+
+def server(input, output, session):
+    @output
+    @render.plot(alt="Sine function")
+    def plot():
+        t = np.arange(0.0, 4.0, 0.01)
+        s = input.amplitude() * np.sin(
+            (2 * np.pi / input.period()) * (t - input.shift() / 2)
+        )
+        fig, ax = plt.subplots()
+        ax.set_ylim([-2, 2])
+        ax.plot(t, s)
+        ax.grid()
+
+
+app = App(app_ui, server)
+
+```
+
+The components below don't contain Shiny applications, but they do use Shinylive to load Pyodide and run Python code in the browser.
+
+Please note that these are experimental and usage may change in the future.
+
+### Editor and terminal
+
+Run selected code or current line with ⌘/Ctrl-Enter; run the entire file with ⌘/Ctrl-Shift-Enter.
+
+:::{.column-page-inset-right}
+```{shinylive-python}
+#| components: [editor, terminal]
+
+def add(a, b):
+    return a + b
+
+sums = map(add, [1, 2, 3], [4, 5, 6])
+list(sums)
+
+```
+:::
+
+
+### Notebook-style cell
+
+
+```{shinylive-python}
+#| components: [editor, cell]
+def add(a, b):
+    return a + b
+
+list(map(add, [2, 3], [4, 5]))
+```
+
+use a GitHub Action to automatically render book need tinytex
+
+
+```r
+install.packages('renv')
+renv::init()
+
+install.packages('tinytex')
+tinytex::install_tinytex()
+```
+
+对pdf, 单行公式$$直接不要有空格

@@ -1,0 +1,21 @@
+project:
+  type: website
+
+website:
+  title: "blog"
+  navbar:
+    right:
+      - about.qmd
+      - icon: github
+        href: https://github.com/xiaoa6435
+      - icon: stack-overflow
+        href: https://stats.stackexchange.com/users/347393/wei
+
+author: "张振昊"
+format:
+  html:
+    theme: cosmo
+    css: styles.css
+
+filters:
+  - shinylive
