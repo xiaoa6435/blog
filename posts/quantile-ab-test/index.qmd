@@ -14,6 +14,12 @@ image: spotify.png
 
 本文主要基于linkedin @liu2019large 的[Large-Scale Online Experimentation with Quantile Metrics](https://arxiv.org/pdf/1903.08762.pdf)和Spotify @schultzberg2022resampling 的[Resampling-free bootstrap inference for quantiles](https://arxiv.org/pdf/2202.10992.pdf)，顺便也会提到和计量经济学的分位数回归的对比，来讨论A/B中分位数指标的处理。
 
+## 非聚类情况的分位数检验
+
+我们先考虑非聚类样本的情况，或者说随机单元等于分析单元的情况。假设有n个独立样本$X = {x_0, x_1, x_2, ..., x_{n - 1}}$, 记为$q_X(\tau)$为X的第$\tau$个分位数，相应的$\hat{q}_X(\tau)$为样本tau分位数
+
+$$ q(\tau) \sim \mathcal{N}(\hat{q}(\tau), \frac{\tau * (1 - \tau)}{n * f(\hat{q}(\tau))^2})) $$
+
 
 
 ### References
