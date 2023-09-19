@@ -1,0 +1,936 @@
+---
+title: "时间片轮转实验的设计和分析"
+date: "2023-09-19"
+categories: [A/B test, switchback experiment]
+image: Screen-Shot-2019-02-19-at-5.41.09-PM.png
+---
+
+时间片轮转实验(switchback experiment)常见于双边/多边市场中，比如滴滴、uber等出行市场，或者美团外卖、饿了么、DoorDash等外卖平台的派单算法/策略实验，在这类实验中，司机和司机之间，乘客和乘客之间，本次派单和下次派单，都有无法忽略的相互影响。另一个常见的场景是价格策略实验：由于政策原因，同一时间在同一个城市，不能出现不同的价格。
+
+一个典型的时间片轮转实验大概是这样的:
+
+![](region-time-unit-randomization.webp)
+
+- 沿着时间轴，等分成小的时间片，随机分配为实验组/对照组。注意，连续的时间片可能都是实验组，或者对照组
+
+- 纵轴是区域/城市，每个区域/城市可以的实验组/对照组序列是不一样的。下面的讨论会先聚焦在只有一个区域的情况，然后扩展到多区域场景
+
+从实验设计的角度来看，时间片轮转实验主要关注以下三个问题：
+
+- 时间片的粒度：很显然，时间片之间并不是独立的，时间片粒度越粗，时间片之间的相互影响越小，但样本量会更少
+
+- 实验组和对照组在时间片的分配：即哪些时间片是实验组，哪些是对照组，这对实验的精度有影响
+
+- 统计处理：实验处理效应的估计值、标准误、p值等
+
+下面的分析主要参照DASE[Design and Analysis of Switchback Experiments](https://arxiv.org/abs/2009.00148)
+
+
+## DASE的论文
+
+基于潜在结果框架，DASE给出了时间片轮转实验的最优设计、非参数的实验处理效应及相应的标准误、p值的估计。
+
+基于DASE，时间片轮转实验需要预先知道三个参数：
+
+- 实验持续长度：比如持续7天
+- 时间片的粒度：这个参数也是需要预先指定的，比如30min
+- 延滞效应(carryover effect)的阶数m: 当前的时间片对后续时间片的影响最多持续到第m个，m = 0意味着时间片之间彼此独立，这个参数也是根据业务经验指定的
+
+### 最优设计
+
+ @bojinov2023design 的Theorem 3给出了时间片轮转实验的最优设计（注：原文的下标是从1开始，这里改成了从0开始）：
+
+1. 当m = 0是，$T^* = {0, 1, 2, 3, 4, ...., T - 1}$，这种情况就是标准的随机分组实验
+2. 当m > 0且T >= 4m (存在T = n * m, 其中 n >= 4)时，$T^* = {0, 2m, 3m, ...., (n - 2)m, T - 1}$
+
+不属于以上两种情况的实验（T很小，或者m很大）讨论价值较小，后续我们重点关注情况2
+
+这里的$T^*$(randomization_points)是随机点的集合，举个具体的例子：
+
+- 假设time_horizon = 12(有12个时间片)，m = 2, 这个时候满足第二个条件
+- 最优设计给出的随机点是[0, 4, 6, 8]
+- 抛4次硬币(有4个随机点)，[0, 4)按第0次硬币的结果进行处理，[4, 6)都是第1次结果...
+- 不妨假设4次硬币的结果分别是[T, C, T, T], 那12个时间片的实验分组分别是[T, T, T, T, C, C, T, T, T, T, T, T]
+
+这个设计和朴素设计，即把m个连续的时间片合成一个大的时间片，再做简单随机，随机点是[0, (m + 1), 2 * (m + 1), ....]有冲突。作者证明了，基于极小极大化原则，最优方案有最小的标准误
+
+最优设计和朴素设计的代码如下
+
+```{python}
+from typing import List
+import random
+
+def generate_opt_design(time_horizon: int, m: int) -> List[int]:
+    assert time_horizon > 0
+    assert m > 0
+
+    randomization_points = [0] + list(range(2 * m, time_horizon - 2 * m + 1, m))
+    return randomization_points
+
+
+def generate_naive_design(time_horizon: int, m: int) -> List[int]:
+    assert time_horizon > 0
+    assert m >= 0
+
+    return list(range(0, time_horizon, m + 1))
+
+
+def generate_assignment_path(randomization_points: List[int], time_horizon: int, m: int, p: float = 0.5) -> (List[int], List[int]):
+    assert len(randomization_points) > 0
+
+    assert time_horizon > 0
+    assert m >= 0
+    assert p > 0.0 and p < 1.0
+
+    randomization_points = list(randomization_points) + [time_horizon]
+    assignment_paths = []
+    for i in range(1, len(randomization_points)):
+        assignment = 1 if random.uniform(0.0, 1.0) < p else 0
+        for j in range(randomization_points[i - 1], randomization_points[i]):
+            assignment_paths.append(assignment)
+    return assignment_paths
+
+# generate_opt_design(12, 2)
+# generate_naive_design(12, 2)
+```
+
+### 实验处理效应估计
+
+在@bojinov2023design 的2.4, 基于Horvitz-Thompson估计，m阶(原文中的lag-*p* effect)的处理效应的公式如下:
+
+$$ 
+\hat{\tau_p}(\eta_T, \omega_{1:T}, Y) = \frac{1}{T - m}(Y_{t}^{obs} * \sum_{t = m}^{T - 1}( \frac{\mathbb{1}{(W_{t - m: t} = \mathbb{1}_{m + 1})}}{Pr(W_{t - m: t} = \mathbb{1}_{m + 1})} - Y_{t}^{obs} * \frac{\mathbb{1}{(W_{t - m: t} = \mathbb{0}_{m + 1})}}{Pr(W_{t - m: t} = \mathbb{0}_{m + 1})})) 
+$$
+
+- 其中$\tau_p$是随机点，上文的randomization_points
+- $\omega_{1:T}$是各个时间片的分组，上文的assignment_paths
+- 这个估计是非参的：它并没有假设m阶的具体的函数形式
+
+看起来有点复杂，我们从一个具体的例子来看, 假设有6个时间片, m = 1, 实验组占比p = 0.4（注：以下所有设计到第x个的地方都是从0开始）
+
+- 随机点randomization_points = [0, 3, 5], 抛三次硬币的结果分别是[1, 0, 0], 6个时间片的分组分别是[1, 1, 1, 0, 0, 0]
+- 观察到各个时间片的指标数y是[1.2, 2.1, 3.0, 2.0, 0.5, 1.6]
+- $\tau$的估计只考虑从当前时间片向前推m个窗口连续是1/0的窗口, 所有6个窗口分别是[nan, 1, 1, nan, 0, 0], 因为第二位和第三位(从0开始)不全是0，或者1，所有第三个是nan
+- 6个窗口对应的 $Pr(W_{t - m: t}$ 分别是[nan, 0.4, 0.4, nan, 0.6, 0.36], 第5个窗口是0.36，因为它需要第一次抛硬币的结果和第二次都是对照组
+- $\tau = \frac{1}{6 - 1} * (2.1 / 0.4 + 3.0 / 0.4 - 0.5 / 0.4 - 1.6 / 0.36) = 1.41$, nan对应的窗口对应的数据会直接抛弃
+
+
+```{python}
+from typing import List
+
+def estimate_tau(
+    randomization_points: List[int],
+    assignment_path: List[int],
+    potential_outcome_path: List[float],
+    m: int,
+    p: float = 0.5
+) -> (float, float, float, float, float):
+
+    assert len(randomization_points) <= len(assignment_path)
+    assert len(assignment_path) == len(potential_outcome_path)
+
+    time_horizon = len(assignment_path)
+    randomization_points_withend = randomization_points + [time_horizon]
+    randomization_ids = []  # 每个时间片对应的随机数的id
+    for i in range(0, len(randomization_points)):
+        for j in range(randomization_points_withend[i], randomization_points_withend[i + 1]):
+            randomization_ids.append(i)
+
+    y_trt, y_ctl, n_trt, n_ctl = 0.0, 0.0, 0.0, 0.0
+    for t in range(m, time_horizon):
+        (beg, end) = (t - m, t + 1)
+        wsum = sum(assignment_path[beg:end])
+        # 窗口内涉及到的随机数id的个数
+        randomization_cnt = len(set(randomization_ids[beg:end])) 
+        if wsum == (m + 1):
+            ps = p ** randomization_cnt
+            y_trt += potential_outcome_path[t] / ps
+            n_trt += 1
+        elif wsum == 0:
+            ps = (1.0 - p) ** randomization_cnt
+            y_ctl += potential_outcome_path[t] / ps
+            n_ctl += 1
+        else:
+            pass
+    n = (len(assignment_path) - m)
+    tau = y_trt / n - y_ctl / n
+
+    return (tau, y_trt / n, y_ctl / n, n_trt, n_ctl)
+
+# randomization_points = [0, 3, 5]
+# assignment_path = [1, 1, 1, 0, 0, 0]
+# potential_outcome_path = [1.2, 2.1, 3.0, 2.0, 0.5, 1.6]
+# m = 1
+# p = 0.4
+# estimate_tau(randomization_points, assignment_path, potential_outcome_path, m, p)
+
+```
+
+在 @bojinov2023design 的4.2，作者给出了在最优设计下的两种估计方差的公式。这两个公式都比较保守（比实际方差大），相应的代码实现如下
+
+```{python}
+from typing import List
+
+def generate_ub_variance_opt_design(
+    randomization_points: List[int],
+    assignment_path: List[int],
+    potential_outcome_path: List[float],
+    m: int,
+    upper_bound_type: int = 2
+) -> float:
+
+    num_randomizations = len(randomization_points)
+    observed_chunks = [sum(potential_outcome_path[(i * m + 2):((i + 1) * m + 2)]) for i in range(num_randomizations + 1)]
+
+    if upper_bound_type == 1:
+        variance = 6 * observed_chunks[0] ** 2 + 6 * observed_chunks[num_randomizations] ** 2
+        for k in range(1, num_randomizations):
+            if assignment_path[k * m] == assignment_path[(k + 1) * m]:
+                variance += 24.0 * observed_chunks[k] ** 2
+
+        for k in range(num_randomizations):
+            if (assignment_path[k * m] == assignment_path[(k + 1) * m] and
+                    assignment_path[(k + 2) * m] == assignment_path[(k + 1) * m]):
+                variance += 16.0 * observed_chunks[k] * observed_chunks[k + 1]
+                
+    elif upper_bound_type == 2:
+        variance = 8 * observed_chunks[0] ** 2 + 8 * observed_chunks[num_randomizations] ** 2
+        for k in range(1, num_randomizations):
+            if assignment_path[k * m] == assignment_path[(k + 1) * m]:
+                variance += 32 * observed_chunks[k] ** 2
+    else:
+        raise ValueError("upper_bound_type in (1, 2)")
+
+    return variance / ((time_horizon - m) ** 2)
+```
+
+有了处理效应和相应的方差，可以构建置信区间和相应的p值等。
+
+另外，也可以根据fisher检验的逻辑计算p值。这个逻辑比较直接，下面直接上代码
+
+```{python}
+from typing import List
+
+def fisher_test_switchback(
+    randomization_points: List[int], 
+    assignment_path: List[int],
+    potential_outcome_path: List[float],
+    m: int,
+    permutations: int = 10000,
+    alternative: str = 'two-sided'
+) -> float:
+    assert m >= 0
+    assert p > 0.0 and p < 1.0
+    assert permutations > 0
+    assert alternative in ['two-sided', 'greater', 'less']
+
+    randomization_points = generate_opt_design(time_horizon, m)
+    realized_tau = estimate_tau(randomization_points, assignment_path, potential_outcome_path, m, p)[0]
+    p_value = 0.0
+
+    for i in range(permutations):
+        sim_assignment_path = generate_assignment_path(randomization_points, time_horizon, m, p)
+        sim_tau = estimate_tau(randomization_points, sim_assignment_path, potential_outcome_path, m, p)[0]
+        if alternative == 'two-sided' and abs(sim_tau) > abs(realized_tau):
+            p_value += 1.0
+        elif alternative == 'greater' and sim_tau > realized_tau:
+            p_value += 1.0
+        elif alternative == 'less' and sim_tau < realized_tau:
+            p_value += 1.0
+    return p_value / permutations
+```
+
+把处理效应和方差估计整合起来，可以给出最终的结果
+
+```{python}
+import scipy
+from dataclasses import dataclass
+from typing import List
+
+@dataclass
+class SwitchbackTestRes:
+    m: int
+    time_horizon: int
+    tau: float
+    treat_mean: float
+    control_mean: float
+    treat_cnt: int
+    control_cnt: int
+    stderr: float = float('nan')
+    p_value: float = float('nan')
+    p: float = 0.5,
+    alternative: str = 'two-sided'
+    permutations: int = 0
+    confidence_level: float = 0.95,
+    upper_bound_type: int = 2
+
+    def __repr__(self) -> str:
+        smy = f"""
+        time_horizon: {self.time_horizon}, carryover order: {self.m}, treat prob: {self.p}
+        tau: {self.tau}, sample treat mean: {self.treat_mean}, sample control_mean: {self.control_mean},
+        valid treat window: {self.treat_cnt}, valid control window: {self.control_cnt}
+        alternative hypothesis: true difference in means is {'not equal to' if self.alternative == 'two-sided' else self.alternative + ' than'} 0
+        """
+
+        if self.permutations > 0:
+            smy += f"""
+            use fisher test, permutations: {self.permutations}
+            p value: {self.p_value}
+            """
+        else:
+            q = scipy.stats.norm.cdf(self.tau / self.stderr)
+            if self.alternative == 'two-sided':
+                self.p_value = 2.0 * (1.0 - q)
+            elif self.alternative == 'greater':
+                self.p_value = 1.0 - q
+            elif self.alternative == 'less':
+                self.p_value = q
+            smy += f"""
+            use neyman test, std err: {self.stderr}
+            p value: {self.p_value}
+            """
+
+            d = -scipy.stats.norm.ppf((1.0 - self.confidence_level) / 2.0)
+            smy += f"""
+            upper_bound_type: {self.upper_bound_type}
+            {self.confidence_level * 100} percent confidence interval: [{self.tau - d * self.stderr}, {self.tau + d * self.stderr}]
+            """
+        return "\n".join([line.lstrip() for line in smy.split("\n")])
+    
+# SwitchbackTestRes(2, 120, 3.0, 8.4, 5.4, 20, 18, 1.9)
+
+def switchback_test(
+    randomization_points: List[int],
+    assignment_path: List[int],
+    potential_outcome_path: List[float],
+    m: int,
+    p: float = 0.5,
+    alternative: str = 'two-sided',
+    permutations: int = 0,
+    confidence_level: float = 0.95,
+    upper_bound_type: int = 2
+):
+
+    assert set(assignment_path) == set([0, 1])
+    assert m >= 0
+    assert p > 0.0 and p < 1.0
+    assert alternative in ['two-sided', 'greater', 'less']
+    assert permutations >= 0
+    assert confidence_level > 0.0 and confidence_level < 1.0
+    assert upper_bound_type in [1, 2]
+
+    (tau, m_trt, m_ctl, n_trt, n_ctl) = estimate_tau(randomization_points, assignment_path, potential_outcome_path, m, p)
+    
+    if permutations <= 0:
+        var = generate_ub_variance_opt_design(randomization_points, assignment_path, potential_outcome_path, m, upper_bound_type)
+        stderr = math.sqrt(var)
+        p_value = float('nan')
+    else: 
+        stderr = float('nan')
+        p_value = fisher_test_switchback(randomization_points, assignment_path, potential_outcome_path, m, permutations, alternative)
+    
+    time_horizon = len(assignment_path) 
+    return SwitchbackTestRes(
+      m, time_horizon, tau, m_trt, m_ctl, n_trt, n_ctl, stderr, p_value, p,
+      alternative, permutations, confidence_level, upper_bound_type
+    )
+
+# time_horizon = 120
+# m = 2
+# p = 0.5
+# randomization_points = generate_opt_design(time_horizon, m)
+# assignment_path = generate_assignment_path(randomization_points, time_horizon, m)
+# potential_outcome_path = generate_outcome(assignment_path, [1.0, 1.0, 1.0])
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p)
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, permutations = 1000)
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'two-sided', confidence_level = 0.90, upper_bound_type = 1)
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'less')
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'greater'
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'two-sided', permutations = 1000)
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'less', permutations = 1000)
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'greater', permutations = 1000)
+
+```
+
+## 在线demo
+
+```{shinylive-python}
+#| components: [editor, cell]
+
+import random
+import math
+import scipy
+from dataclasses import dataclass
+from typing import List
+
+
+def generate_opt_design(time_horizon: int, m: int) -> List[int]:
+    assert time_horizon > 0
+    assert m > 0
+
+    randomization_points = [0] + list(range(2 * m, time_horizon - 2 * m + 1, m))
+    return randomization_points
+
+
+def generate_naive_design(time_horizon: int, m: int) -> List[int]:
+    assert time_horizon > 0
+    assert m >= 0
+
+    return list(range(0, time_horizon, m + 1))
+
+
+def generate_assignment_path(randomization_points: List[int], time_horizon: int, m: int, p: float = 0.5) -> (List[int], List[int]):
+    assert len(randomization_points) > 0
+
+    assert time_horizon > 0
+    assert m >= 0
+    assert p > 0.0 and p < 1.0
+
+    randomization_points = list(randomization_points) + [time_horizon]
+    assignment_paths = []
+    for i in range(1, len(randomization_points)):
+        assignment = 1 if random.uniform(0.0, 1.0) < p else 0
+        for j in range(randomization_points[i - 1], randomization_points[i]):
+            assignment_paths.append(assignment)
+    return assignment_paths
+
+def estimate_tau(
+    randomization_points: List[int],
+    assignment_path: List[int],
+    potential_outcome_path: List[float],
+    m: int,
+    p: float = 0.5
+) -> (float, float, float, float, float):
+
+    assert len(randomization_points) <= len(assignment_path)
+    assert len(assignment_path) == len(potential_outcome_path)
+
+    time_horizon = len(assignment_path)
+    randomization_points_withend = randomization_points + [time_horizon]
+    randomization_ids = []  # 每个时间片对应的随机数的id
+    for i in range(0, len(randomization_points)):
+        for j in range(randomization_points_withend[i], randomization_points_withend[i + 1]):
+            randomization_ids.append(i)
+
+    y_trt, y_ctl, n_trt, n_ctl = 0.0, 0.0, 0.0, 0.0
+    for t in range(m, time_horizon):
+        (beg, end) = (t - m, t + 1)
+        wsum = sum(assignment_path[beg:end])
+        # 窗口内涉及到的随机数id的个数
+        randomization_cnt = len(set(randomization_ids[beg:end])) 
+        if wsum == (m + 1):
+            ps = p ** randomization_cnt
+            y_trt += potential_outcome_path[t] / ps
+            n_trt += 1
+        elif wsum == 0:
+            ps = (1.0 - p) ** randomization_cnt
+            y_ctl += potential_outcome_path[t] / ps
+            n_ctl += 1
+        else:
+            pass
+    n = (len(assignment_path) - m)
+    tau = y_trt / n - y_ctl / n
+    return (tau, y_trt / n, y_ctl / n, n_trt, n_ctl)
+
+def fisher_test_switchback(
+    randomization_points: List[int], 
+    assignment_path: List[int],
+    potential_outcome_path: List[float],
+    m: int,
+    permutations: int = 10000,
+    alternative: str = 'two-sided'
+) -> float:
+    assert m >= 0
+    assert p > 0.0 and p < 1.0
+    assert permutations > 0
+    assert alternative in ['two-sided', 'greater', 'less']
+
+    randomization_points = generate_opt_design(time_horizon, m)
+    realized_tau = estimate_tau(randomization_points, assignment_path, potential_outcome_path, m, p)[0]
+    p_value = 0.0
+
+    for i in range(permutations):
+        sim_assignment_path = generate_assignment_path(randomization_points, time_horizon, m, p)
+        sim_tau = estimate_tau(randomization_points, sim_assignment_path, potential_outcome_path, m, p)[0]
+        if alternative == 'two-sided' and abs(sim_tau) > abs(realized_tau):
+            p_value += 1.0
+        elif alternative == 'greater' and sim_tau > realized_tau:
+            p_value += 1.0
+        elif alternative == 'less' and sim_tau < realized_tau:
+            p_value += 1.0
+    return p_value / permutations
+
+def generate_ub_variance_opt_design(
+    randomization_points: List[int],
+    assignment_path: List[int],
+    potential_outcome_path: List[float],
+    m: int,
+    upper_bound_type: int = 2
+) -> float:
+
+    num_randomizations = len(randomization_points)
+    observed_chunks = [sum(potential_outcome_path[(i * m + 2):((i + 1) * m + 2)]) for i in range(num_randomizations + 1)]
+
+    if upper_bound_type == 1:
+        variance = 6 * observed_chunks[0] ** 2 + 6 * observed_chunks[num_randomizations] ** 2
+        for k in range(1, num_randomizations):
+            if assignment_path[k * m] == assignment_path[(k + 1) * m]:
+                variance += 24.0 * observed_chunks[k] ** 2
+
+        for k in range(num_randomizations):
+            if (assignment_path[k * m] == assignment_path[(k + 1) * m] and
+                    assignment_path[(k + 2) * m] == assignment_path[(k + 1) * m]):
+                variance += 16.0 * observed_chunks[k] * observed_chunks[k + 1]
+                
+    elif upper_bound_type == 2:
+        variance = 8 * observed_chunks[0] ** 2 + 8 * observed_chunks[num_randomizations] ** 2
+        for k in range(1, num_randomizations):
+            if assignment_path[k * m] == assignment_path[(k + 1) * m]:
+                variance += 32 * observed_chunks[k] ** 2
+    else:
+        raise ValueError("upper_bound_type in (1, 2)")
+
+    return variance / ((time_horizon - m) ** 2)
+
+def fisher_test_switchback(
+    randomization_points: List[int], 
+    assignment_path: List[int],
+    potential_outcome_path: List[float],
+    m: int,
+    permutations: int = 10000,
+    alternative: str = 'two-sided'
+) -> float:
+    assert m >= 0
+    assert p > 0.0 and p < 1.0
+    assert permutations > 0
+    assert alternative in ['two-sided', 'greater', 'less']
+
+    randomization_points = generate_opt_design(time_horizon, m)
+    realized_tau = estimate_tau(randomization_points, assignment_path, potential_outcome_path, m, p)[0]
+    p_value = 0.0
+
+    for i in range(permutations):
+        sim_assignment_path = generate_assignment_path(randomization_points, time_horizon, m, p)
+        sim_tau = estimate_tau(randomization_points, sim_assignment_path, potential_outcome_path, m, p)[0]
+        if alternative == 'two-sided' and abs(sim_tau) > abs(realized_tau):
+            p_value += 1.0
+        elif alternative == 'greater' and sim_tau > realized_tau:
+            p_value += 1.0
+        elif alternative == 'less' and sim_tau < realized_tau:
+            p_value += 1.0
+    return p_value / permutations
+
+@dataclass
+class SwitchbackTestRes:
+    m: int
+    time_horizon: int
+    tau: float
+    treat_mean: float
+    control_mean: float
+    treat_cnt: int
+    control_cnt: int
+    stderr: float = float('nan')
+    p_value: float = float('nan')
+    p: float = 0.5,
+    alternative: str = 'two-sided'
+    permutations: int = 0
+    confidence_level: float = 0.95,
+    upper_bound_type: int = 2
+
+    def __repr__(self) -> str:
+        smy = f"""
+        time_horizon: {self.time_horizon}, carryover order: {self.m}, treat prob: {self.p}
+        tau: {self.tau}, sample treat mean: {self.treat_mean}, sample control_mean: {self.control_mean},
+        valid treat window: {self.treat_cnt}, valid control window: {self.control_cnt}
+        alternative hypothesis: true difference in means is {'not equal to' if self.alternative == 'two-sided' else self.alternative + ' than'} 0
+        """
+
+        if self.permutations > 0:
+            smy += f"""
+            use fisher test, permutations: {self.permutations}
+            p value: {self.p_value}
+            """
+        else:
+            q = scipy.stats.norm.cdf(self.tau / self.stderr)
+            if self.alternative == 'two-sided':
+                self.p_value = 2.0 * (1.0 - q)
+            elif self.alternative == 'greater':
+                self.p_value = 1.0 - q
+            elif self.alternative == 'less':
+                self.p_value = q
+            smy += f"""
+            use neyman test, std err: {self.stderr}
+            p value: {self.p_value}
+            """
+
+            d = -scipy.stats.norm.ppf((1.0 - self.confidence_level) / 2.0)
+            smy += f"""
+            upper_bound_type: {self.upper_bound_type}
+            {self.confidence_level * 100} percent confidence interval: [{self.tau - d * self.stderr}, {self.tau + d * self.stderr}]
+            """
+        return "\n".join([line.lstrip() for line in smy.split("\n")])
+
+def switchback_test(
+    randomization_points: List[int],
+    assignment_path: List[int],
+    potential_outcome_path: List[float],
+    m: int,
+    p: float = 0.5,
+    alternative: str = 'two-sided',
+    permutations: int = 0,
+    confidence_level: float = 0.95,
+    upper_bound_type: int = 2
+):
+
+    assert set(assignment_path) == set([0, 1])
+    assert m >= 0
+    assert p > 0.0 and p < 1.0
+    assert alternative in ['two-sided', 'greater', 'less']
+    assert permutations >= 0
+    assert confidence_level > 0.0 and confidence_level < 1.0
+    assert upper_bound_type in [1, 2]
+
+    (tau, m_trt, m_ctl, n_trt, n_ctl) = estimate_tau(randomization_points, assignment_path, potential_outcome_path, m, p)
+    
+    if permutations <= 0:
+        var = generate_ub_variance_opt_design(randomization_points, assignment_path, potential_outcome_path, m, upper_bound_type)
+        stderr = math.sqrt(var)
+        p_value = float('nan')
+    else: 
+        stderr = float('nan')
+        p_value = fisher_test_switchback(randomization_points, assignment_path, potential_outcome_path, m, permutations, alternative)
+    
+    time_horizon = len(assignment_path) 
+    return SwitchbackTestRes(
+      m, time_horizon, tau, m_trt, m_ctl, n_trt, n_ctl, stderr, p_value, p,
+      alternative, permutations, confidence_level, upper_bound_type
+    )
+
+def generate_outcome(assignment_path: List[int], tau: List[float], mu: float = 0.0) -> List[float]:
+
+    assert len(tau) > 0, 'tau is empty'
+    assert len(assignment_path) >= len(tau), 'delta is longer then assign path'
+
+    time_horizon = len(assignment_path)
+    carryover_order = len(tau)
+    ret = list()
+    for t in range(time_horizon):
+        alpht_t = math.log(t + 1)  # fixed effect associated to period t
+        epsilon = random.gauss(0.0, 1.0)  # random noise in period t
+        contemporaneous_carryover_effect = sum(
+            tau[i] * assignment_path[t - i] for i in range(min(carryover_order, t)))
+        y = mu + alpht_t + contemporaneous_carryover_effect + epsilon
+        ret.append(y)
+    return ret
+
+random.seed(0)
+
+time_horizon = 120
+m = 2
+p = 0.5
+
+randomization_points = generate_opt_design(time_horizon, m) # 最优设计的随机点
+assignment_path = generate_assignment_path(randomization_points, time_horizon, m) # 每个时间片的实验分组
+# 模拟的每个时间片的指标，这里m = 2, 真实的处理效应是3.0, 具体逻辑见附-测试数据的生成
+potential_outcome_path = generate_outcome(assignment_path, [1.0, 1.0, 1.0]) 
+
+switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, permutations = 0) # neyman asymptotic inference
+switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, permutations = 1000) # fisher exact inference
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'two-sided', confidence_level = 0.90, upper_bound_type = 1)
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'less')
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'greater'
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'two-sided', permutations = 1000)
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'less', permutations = 1000)
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'greater', permutations = 1000)
+
+```
+
+
+# 附
+
+## 测试数据的生成逻辑
+
+测试数据根据以下公式(@bojinov2023design 的6.1的公式(15))生成
+
+$$
+Y_t(w_{0:t}) = \mu + \alpha_t + \sum_{i = 0}^{min(m, t)}(\delta^{(i)} * w_{t - i}) + \epsilon_t
+$$
+
+
+```{python}
+from typing import List
+import math
+
+def generate_outcome(assignment_path: List[int], tau: List[float], mu: float = 0.0) -> List[float]:
+
+    assert len(tau) > 0, 'tau is empty'
+    assert len(assignment_path) >= len(tau), 'delta is longer then assign path'
+
+    time_horizon = len(assignment_path)
+    carryover_order = len(tau)
+    ret = list()
+    for t in range(time_horizon):
+        alpht_t = math.log(t + 1)  # fixed effect associated to period t
+        epsilon = random.gauss(0.0, 1.0)  # random noise in period t
+        contemporaneous_carryover_effect = sum(
+            tau[i] * assignment_path[t - i] for i in range(min(carryover_order, t)))
+        y = mu + alpht_t + contemporaneous_carryover_effect + epsilon
+        ret.append(y)
+    return ret
+
+# generate_outcome([1, 0, 1, 0], [1.0, 2.0]) 
+```
+
+## 原代码
+
+@bojinov2023design 论文的原代码[](https://github.com/jinglongzhao/DASE/tree/main)，有部分小的改动
+
+```r
+#| eval: false
+
+generate_outcomes <- function(assignment.path_) {
+  Y.vec <- c()
+  Y.vec.1 <- mu.fixed.effect + alpha.fixed.effects[1] + delta.coef.1 * assignment.path_[1] + epsilon.noises[1]
+  Y.vec.2 <- mu.fixed.effect + alpha.fixed.effects[2] + delta.coef.1 * assignment.path_[2] + delta.coef.2 * assignment.path_[1] + epsilon.noises[2]
+  Y.vec <- c(Y.vec.1, Y.vec.2)
+  for (t.temp in 1:time.horizon)
+  {
+    Y.temp <- mu.fixed.effect + alpha.fixed.effects[t.temp] + delta.coef.1 * assignment.path_[t.temp] + delta.coef.2 * assignment.path_[t.temp - 1] + delta.coef.3 * assignment.path_[t.temp - 2] + epsilon.noises[t.temp]
+    Y.vec <- c(Y.vec, Y.temp)
+  }
+  return(Y.vec)
+}
+
+generate_assignments <- function(time.horizon = time.horizon, randomization.points = randomization.points, re.randomization = FALSE) {
+  K <- length(randomization.points)
+  # W.at.K.vec = sample(c(0,1), replace=TRUE, size=K)
+  W.at.K.vec <- as.numeric(runif(K) < 0.5)
+  W.vec <- c()
+  if (K > 1) {
+    # ===When k <= K-1, append the proper assignments during each epoch
+    for (k.temp in 1:(K - 1))
+    {
+      W.vec <- c(W.vec, rep(W.at.K.vec[k.temp], randomization.points[k.temp + 1] - randomization.points[k.temp]))
+    }
+    # ===When k == K, append the last epoch after the last randomization
+    W.vec <- c(W.vec, rep(W.at.K.vec[K], time.horizon + 1 - randomization.points[K]))
+  }
+  if (K == 1) {
+    W.vec <- rep(W.at.K.vec[K], time.horizon + 1 - randomization.points[K])
+  }
+
+  if (re.randomization == TRUE) {
+    treatment.balance <- abs(sum(W.at.K.vec) - K / 2)
+    while (treatment.balance > 2) {
+      W.at.K.vec <- sample(c(0, 1), replace = TRUE, size = K)
+      W.vec <- c()
+      if (K > 1) {
+        # ===When k <= K-1, append the proper assignments during each epoch
+        for (k.temp in 1:(K - 1))
+        {
+          W.vec <- c(W.vec, rep(W.at.K.vec[k.temp], randomization.points[k.temp + 1] - randomization.points[k.temp]))
+        }
+        # ===When k == K, append the last epoch after the last randomization
+        W.vec <- c(W.vec, rep(W.at.K.vec[K], time.horizon + 1 - randomization.points[K]))
+      }
+      if (K == 1) {
+        W.vec <- rep(W.at.K.vec[K], time.horizon + 1 - randomization.points[K])
+      }
+      treatment.balance <- abs(sum(W.at.K.vec) - K / 2)
+    }
+  }
+
+  return(W.vec)
+}
+
+generate_estimator <- function(randomization.points_ = randomization.points,
+                               assignment.path_ = assignment.path,
+                               potential.outcome.path_ = potential.outcome.path,
+                               p.lag.length_ = p.lag.length) {
+  inversed.propensity.score <- rep(0, p.lag.length_)
+  for (t in (p.lag.length_ + 1):time.horizon)
+  {
+    i.p.s.temp <- 2^(sum(randomization.points_ %in% ((t - p.lag.length_ + 1):t)) + 1)
+    inversed.propensity.score <- c(inversed.propensity.score, i.p.s.temp)
+  }
+  # inversed.propensity.score
+  positive.or.negative <- rep(0, p.lag.length_)
+  for (t in (p.lag.length_ + 1):time.horizon)
+  {
+    if (sum(assignment.path_[(t - p.lag.length_):t] == 1) == (p.lag.length_ + 1)) {
+      p.or.n.temp <- 1
+    } else if (sum(assignment.path_[(t - p.lag.length_):t] == 1) == 0) {
+      p.or.n.temp <- -1
+    } else {
+      p.or.n.temp <- 0
+    }
+    positive.or.negative <- c(positive.or.negative, p.or.n.temp)
+  }
+  # positive.or.negative
+  estimator.return <- sum(potential.outcome.path_ * inversed.propensity.score * positive.or.negative) / (time.horizon - p.lag.length_)
+  return(estimator.return)
+}
+
+generate_variance_UB_OPTDesign <- function(randomization.points_ = randomization.points,
+                                           assignment.path_,
+                                           potential.outcome.path_,
+                                           p.lag.length_ = p.lag.length,
+                                           which.upper.bound = 2) {
+  K.many.randomizations <- length(randomization.points_)
+  # ==Note: 1. n in the paper corresponds to (K.many.randomizations+2)
+  #        2. the paper starts with k=0; the codes starts with K.many.randomizations=1
+  observed.chunks <- c()
+  for (this.randomization in 1:(K.many.randomizations + 1))
+  {
+    temp.sum <- sum(potential.outcome.path_[(this.randomization * p.lag.length_ + 1):((this.randomization + 1) * p.lag.length_)])
+    observed.chunks <- c(observed.chunks, temp.sum)
+  }
+  if (which.upper.bound == 1) {
+    variance.estimator <- 6 * (observed.chunks[1])^2 + 6 * (observed.chunks[K.many.randomizations + 1])^2
+    for (this.randomization in 2:(K.many.randomizations))
+    {
+      if (assignment.path_[(this.randomization - 1) * p.lag.length_ + 1] == assignment.path_[this.randomization * p.lag.length_ + 1]) {
+        variance.estimator <- variance.estimator + 24 * (observed.chunks[this.randomization])^2
+      }
+    }
+    for (this.randomization in 1:(K.many.randomizations))
+    {
+      if (assignment.path_[(this.randomization - 1) * p.lag.length_ + 1] == assignment.path_[this.randomization * p.lag.length_ + 1] &&
+        assignment.path_[(this.randomization + 1) * p.lag.length_ + 1] == assignment.path_[this.randomization * p.lag.length_ + 1]) {
+        variance.estimator <- variance.estimator + 16 * observed.chunks[this.randomization] * observed.chunks[this.randomization + 1]
+      }
+    }
+  }
+  if (which.upper.bound == 2) {
+    variance.estimator <- 8 * (observed.chunks[1])^2 + 8 * (observed.chunks[K.many.randomizations + 1])^2
+    for (this.randomization in 2:(K.many.randomizations))
+    {
+      if (assignment.path_[(this.randomization - 1) * p.lag.length_ + 1] == assignment.path_[this.randomization * p.lag.length_ + 1]) {
+        variance.estimator <- variance.estimator + 32 * (observed.chunks[this.randomization])^2
+      }
+    }
+  }
+  estimator.return <- variance.estimator / ((time.horizon - p.lag.length_)^2)
+  return(estimator.return)
+}
+
+my_fisher_test <- function(randomization.points_ = randomization.points,
+                           realized.outcome.path_ = realized.outcome.path,
+                           realized.HT.estimator_ = realized.HT.estimator,
+                           SAMPLE.TIMES.fisher.test_ = SAMPLE.TIMES.fisher.test) {
+  indicator.more.extreme <- c()
+  for (TIMES.temp in 1:SAMPLE.TIMES.fisher.test_)
+  {
+    simulated.assignment.path <- generate_assignments(time.horizon, randomization.points_)
+    simulated.HT.estimator <- generate_estimator(randomization.points_, simulated.assignment.path, realized.outcome.path_)
+
+    if (abs(simulated.HT.estimator) > abs(realized.HT.estimator_)) {
+      indicator.more.extreme <- c(indicator.more.extreme, 1)
+    } else {
+      indicator.more.extreme <- c(indicator.more.extreme, 0)
+    }
+  }
+  return(sum(indicator.more.extreme) / SAMPLE.TIMES.fisher.test_)
+}
+
+
+set.seed(111111)
+time.horizon <- 120
+no.m.carryover <- 2
+p.lag.length <- 2
+
+SPEC.temp <- 1
+
+mu.fixed.effect <- 0
+alpha.fixed.effects <- log(1:time.horizon) # runif(time.horizon, min = 0, max = 1) #rnorm(time.horizon, mean = 0, sd = 1)
+epsilon.noises <- rnorm(time.horizon, mean = 0, sd = 1)
+
+SPEC.temp <- SPEC.temp - 1
+delta.coef.1 <- (SPEC.temp >= 4) * 2 + (SPEC.temp < 4) * 1
+delta.coef.2 <- ((SPEC.temp %% 4) >= 2) * 2 + ((SPEC.temp %% 4) < 2) * 1
+delta.coef.3 <- ((SPEC.temp %% 2) >= 1) * 2 + ((SPEC.temp %% 2) < 1) * 1
+
+# ===Optimal design===#
+randomization.points <- c(1, seq(2 * p.lag.length + 1, time.horizon - 2 * p.lag.length + 1, by = p.lag.length))
+randomization.points_ <- randomization.points
+
+set.seed(111111)
+assignment.path <- generate_assignments(time.horizon, randomization.points_)
+assignment.path_ <- assignment.path
+set.seed(111111)
+potential.outcome.path <- generate_outcomes(assignment.path_ = assignment.path)
+potential.outcome.path_ <- potential.outcome.path
+p.lag.length_ <- p.lag.length
+HT.estimator <- generate_estimator(randomization.points_, assignment.path, potential.outcome.path, p.lag.length)
+
+paste0(randomization.points - 1, collapse = ", ")
+paste0(assignment.path, collapse = ", ")
+paste0(potential.outcome.path, collapse = ", ")
+
+generate_variance_UB_OPTDesign(randomization.points, assignment.path, potential.outcome.path, p.lag.length, 1)
+generate_variance_UB_OPTDesign(randomization.points, assignment.path, potential.outcome.path, p.lag.length, 2)
+
+set.seed(111111)
+realized.outcome.path <- potential.outcome.path
+realized.HT.estimator <- HT.estimator
+p_value <- my_fisher_test(randomization.points, realized.outcome.path, realized.HT.estimator, 10000)
+
+```
+
+## 测试
+
+```{python}
+#| eval: false
+
+import rpy2
+from rpy2 import robjects
+
+def uniform(low=0.0, high=1.0):
+    return rpy2.robjects.r(f'runif(1, {low}, {high})')[0]
+random.uniform = uniform
+
+def gauss(mu=0.0, sigma=1.0):
+    return rpy2.robjects.r(f'rnorm(1, {mu}, {sigma})')[0]
+random.gauss = gauss
+
+time_horizon = 120
+m = 2
+p = 0.5
+randomization_points = generate_opt_design(time_horizon, m)
+randomization_points == [0, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 102, 104, 106, 108, 110, 112, 114, 116]
+
+rpy2.robjects.r('set.seed(111111)')
+assignment_path = generate_assignment_path(randomization_points, time_horizon, m)
+assignment_path == [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
+
+rpy2.robjects.r('set.seed(111111)')
+tau = [1.0, 1.0, 1.0]
+new = generate_outcome(assignment_path, tau)
+
+old = [0.434833396762166, 4.16060424082402, 2.91790649574515, 1.39691331193944, 1.89948806343165, 1.03413730352493, 2.15911140118438, 0.726763259743356, 2.92463672663345, 4.58618087124496, 4.18384842961183, 3.1231545672721, 3.21073297148204, 3.47490426238806, 3.56474787955819, 2.54866565554569, 4.91954787364933, 4.88928321075681, 4.9743504050517, 2.70367936403911, 2.95728735703276, 2.98231567022872, 3.15047612777084, 4.75759922483731, 4.21003885524797, 4.18157462124439, 3.98018891962639, 1.16235745274864, 3.50045561681502, 4.71330628773, 7.41427588498954, 7.58288977468063, 3.66055128679812, 6.66440465565843, 7.76594302836741, 6.77364773746862, 6.81486072393467, 7.17627340036311, 6.94461498042583, 4.95567982004171, 4.134366340668, 4.77460987865831, 3.66956005339461, 4.66945960334466, 6.96777432423419, 8.82477105962375, 7.93560696678956, 7.09219170394525, 7.41808254583203, 6.72985155755407, 6.17527976040663, 5.50046812367082, 5.36712241699065, 6.55157620396049, 6.6043594442257, 4.3693445377948, 4.19116981629592, 7.11932150789102, 7.20109572388284, 4.52958187431917, 5.65838275247701, 5.59302894651198, 7.64497906403363, 7.05994580978854, 6.42953658082273, 4.93605896614588, 4.57012924056999, 5.13460375030383, 3.98956716798835, 4.5981473775092, 5.24111915320301, 6.76715647313569, 6.48136089503326, 3.3390609421107, 4.38550261887666, 4.00281801241419, 5.63593883392727, 4.51114882325828, 6.69375332242523, 6.67908667999775, 7.76266602632671, 7.45073549720124, 8.07512244608518, 8.18160320073618, 7.31424756022565, 6.33777035346318, 8.29799454274423, 7.86514809758498, 6.40034682322799, 5.61428130970244, 6.26500016482481, 5.98545855080484, 9.56853136084471, 8.27671475492981, 8.12184976500245, 7.68740785084192, 5.47432743435136, 6.66885979993122, 5.27395984151641, 5.97031188315572, 5.27049863949522, 5.25857394090524, 5.51198076300874, 7.90167715761987, 6.1132133505048, 4.17501094237396, 4.36195238641099, 5.938491498465, 3.64356687366051, 3.31405838215769, 6.66062556034787, 4.40917856947105, 7.63688284192356, 9.25694462626588, 8.20932808339688, 5.74591373194745, 6.52468337004635, 7.62154595985734, 2.27443244264151, 4.38031586688583]
+sum(1 if abs(i - j) < 1.0e-10 else 0 for (i, j) in zip(new, old)) == time_horizon
+
+potential_outcome_path = new
+new_est = estimate_tau(
+  randomization_points, 
+  assignment_path, 
+  potential_outcome_path, 
+  m
+)
+abs(new_est[0] - 6.295755) < 1.0e-6
+
+var1 = generate_ub_variance_opt_design(randomization_points, assignment_path, potential_outcome_path, m, 1)
+var2 = generate_ub_variance_opt_design(randomization_points, assignment_path, potential_outcome_path, m, 2)
+abs(var1 - 10.798) < 1.0e-3
+abs(var2 - 10.307) < 1.0e-3
+
+
+rpy2.robjects.r('set.seed(111111)')
+p_value = fisher_test_switchback(
+  randomization_points,
+  assignment_path, 
+  potential_outcome_path, 
+  m, 10000
+)
+abs(p_value - 0.032) < 1.0e-3
+```

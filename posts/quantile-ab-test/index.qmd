@@ -1,6 +1,6 @@
 ---
 title: "A/B test中分位数指标的处理"
-date: "2023-09-15"
+date: "2023-09-18"
 categories: [A/B test, quantile test]
 bibliography: references.bib
 image: spotify.png
