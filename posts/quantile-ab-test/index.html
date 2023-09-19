@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="张振昊">
-<meta name="dcterms.date" content="2023-09-15">
+<meta name="dcterms.date" content="2023-09-18">
 
 <title>blog - A/B test中分位数指标的处理</title>
 <style>
@@ -81,6 +81,8 @@ div.csl-indent {
   }
 }</script>
 
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
 
 <link rel="stylesheet" href="../../styles.css">
 </head>
@@ -148,7 +150,7 @@ div.csl-indent {
       <div>
       <div class="quarto-title-meta-heading">Published</div>
       <div class="quarto-title-meta-contents">
-        <p class="date">September 15, 2023</p>
+        <p class="date">September 18, 2023</p>
       </div>
     </div>
     
@@ -172,6 +174,10 @@ div.csl-indent {
 <li><p>线上零工经济，这和计量经济学中分位数检验/回归的核心问题类似。比如，对滴滴/uber的派单/抽成策略实验的讨论中，我们不仅需要关注对司机平均收入的影响，还需要注意策略是否加剧了司机收入的不平等，这里就需要关注策略对司机收入的分位数的影响</p></li>
 </ul>
 <p>本文主要基于linkedin <span class="citation" data-cites="liu2019large">Liu et al. (<a href="#ref-liu2019large" role="doc-biblioref">2019</a>)</span> 的<a href="https://arxiv.org/pdf/1903.08762.pdf">Large-Scale Online Experimentation with Quantile Metrics</a>和Spotify <span class="citation" data-cites="schultzberg2022resampling">Schultzberg and Ankargren (<a href="#ref-schultzberg2022resampling" role="doc-biblioref">2022</a>)</span> 的<a href="https://arxiv.org/pdf/2202.10992.pdf">Resampling-free bootstrap inference for quantiles</a>，顺便也会提到和计量经济学的分位数回归的对比，来讨论A/B中分位数指标的处理。</p>
+<section id="非聚类情况的分位数检验" class="level2">
+<h2 class="anchored" data-anchor-id="非聚类情况的分位数检验">非聚类情况的分位数检验</h2>
+<p>我们先考虑非聚类样本的情况，或者说随机单元等于分析单元的情况。假设有n个独立样本<span class="math inline">\(X = {x_0, x_1, x_2, ..., x_{n - 1}}\)</span>, 记为<span class="math inline">\(q_X(\tau)\)</span>为X的第<span class="math inline">\(\tau\)</span>个分位数，相应的<span class="math inline">\(\hat{q}_X(\tau)\)</span>为样本tau分位数</p>
+<p><span class="math display">\[ q(\tau) \sim \mathcal{N}(\hat{q}(\tau), \frac{\tau * (1 - \tau)}{n * f(\hat{q}(\tau))^2})) \]</span></p>
 <section id="references" class="level3">
 <h3 class="anchored" data-anchor-id="references">References</h3>
 <div id="refs" class="references csl-bib-body hanging-indent" role="list">
@@ -184,6 +190,7 @@ Schultzberg, Mårten, and Sebastian Ankargren. 2022. <span>“Resampling-Free Bo
 </div>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->

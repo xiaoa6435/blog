@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.450">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="张振昊">
+<meta name="dcterms.date" content="2023-09-19">
+
+<title>blog - 时间片轮转实验的设计和分析</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<meta name="shinylive:serviceworker_dir" content="../..">
+<script src="../../site_libs/quarto-contrib/shinylive-0.1.6/shinylive/load-shinylive-sw.js" type="module"></script>
+<script src="../../site_libs/quarto-contrib/shinylive-0.1.6/shinylive/run-python-blocks.js" type="module"></script>
+<link href="../../site_libs/quarto-contrib/shinylive-0.1.6/shinylive/shinylive.css" rel="stylesheet">
+<link href="../../site_libs/quarto-contrib/shinylive-quarto-css/shinylive-quarto.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+
+<body class="nav-fixed fullcontent">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">blog</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html" rel="" target="">
+ <span class="menu-text">About</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/xiaoa6435" rel="" target=""><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://stats.stackexchange.com/users/347393/wei" rel="" target=""><i class="bi bi-stack-overflow" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+            <div class="quarto-navbar-tools">
+</div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">时间片轮转实验的设计和分析</h1>
+                                <div class="quarto-categories">
+                <div class="quarto-category">A/B test</div>
+                <div class="quarto-category">switchback experiment</div>
+              </div>
+                  </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta">
+
+      <div>
+      <div class="quarto-title-meta-heading">Author</div>
+      <div class="quarto-title-meta-contents">
+               <p>张振昊 </p>
+            </div>
+    </div>
+      
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">September 19, 2023</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+<p>时间片轮转实验(switchback experiment)常见于双边/多边市场中，比如滴滴、uber等出行市场，或者美团外卖、饿了么、DoorDash等外卖平台的派单算法/策略实验，在这类实验中，司机和司机之间，乘客和乘客之间，本次派单和下次派单，都有无法忽略的相互影响。另一个常见的场景是价格策略实验：由于政策原因，同一时间在同一个城市，不能出现不同的价格。</p>
+<p>一个典型的时间片轮转实验大概是这样的:</p>
+<p><img src="region-time-unit-randomization.webp" class="img-fluid"></p>
+<ul>
+<li><p>沿着时间轴，等分成小的时间片，随机分配为实验组/对照组。注意，连续的时间片可能都是实验组，或者对照组</p></li>
+<li><p>纵轴是区域/城市，每个区域/城市可以的实验组/对照组序列是不一样的。下面的讨论会先聚焦在只有一个区域的情况，然后扩展到多区域场景</p></li>
+</ul>
+<p>从实验设计的角度来看，时间片轮转实验主要关注以下三个问题：</p>
+<ul>
+<li><p>时间片的粒度：很显然，时间片之间并不是独立的，时间片粒度越粗，时间片之间的相互影响越小，但样本量会更少</p></li>
+<li><p>实验组和对照组在时间片的分配：即哪些时间片是实验组，哪些是对照组，这对实验的精度有影响</p></li>
+<li><p>统计处理：实验处理效应的估计值、标准误、p值等</p></li>
+</ul>
+<p>下面的分析主要参照DASE<a href="https://arxiv.org/abs/2009.00148">Design and Analysis of Switchback Experiments</a></p>
+<section id="dase的论文" class="level2">
+<h2 class="anchored" data-anchor-id="dase的论文">DASE的论文</h2>
+<p>基于潜在结果框架，DASE给出了时间片轮转实验的最优设计、非参数的实验处理效应及相应的标准误、p值的估计。</p>
+<p>基于DASE，时间片轮转实验需要预先知道三个参数：</p>
+<ul>
+<li>实验持续长度：比如持续7天</li>
+<li>时间片的粒度：这个参数也是需要预先指定的，比如30min</li>
+<li>延滞效应(carryover effect)的阶数m: 当前的时间片对后续时间片的影响最多持续到第m个，m = 0意味着时间片之间彼此独立，这个参数也是根据业务经验指定的</li>
+</ul>
+<section id="最优设计" class="level3">
+<h3 class="anchored" data-anchor-id="最优设计">最优设计</h3>
+<p><span class="citation" data-cites="bojinov2023design">@bojinov2023design</span> 的Theorem 3给出了时间片轮转实验的最优设计（注：原文的下标是从1开始，这里改成了从0开始）：</p>
+<ol type="1">
+<li>当m = 0是，<span class="math inline">\(T^* = {0, 1, 2, 3, 4, ...., T - 1}\)</span>，这种情况就是标准的随机分组实验</li>
+<li>当m &gt; 0且T &gt;= 4m (存在T = n * m, 其中 n &gt;= 4)时，<span class="math inline">\(T^* = {0, 2m, 3m, ...., (n - 2)m, T - 1}\)</span></li>
+</ol>
+<p>不属于以上两种情况的实验（T很小，或者m很大）讨论价值较小，后续我们重点关注情况2</p>
+<p>这里的<span class="math inline">\(T^*\)</span>(randomization_points)是随机点的集合，举个具体的例子：</p>
+<ul>
+<li>假设time_horizon = 12(有12个时间片)，m = 2, 这个时候满足第二个条件</li>
+<li>最优设计给出的随机点是[0, 4, 6, 8]</li>
+<li>抛4次硬币(有4个随机点)，[0, 4)按第0次硬币的结果进行处理，[4, 6)都是第1次结果…</li>
+<li>不妨假设4次硬币的结果分别是[T, C, T, T], 那12个时间片的实验分组分别是[T, T, T, T, C, C, T, T, T, T, T, T]</li>
+</ul>
+<p>这个设计和朴素设计，即把m个连续的时间片合成一个大的时间片，再做简单随机，随机点是[0, (m + 1), 2 * (m + 1), ….]有冲突。作者证明了，基于极小极大化原则，最优方案有最小的标准误</p>
+<p>最优设计和朴素设计的代码如下</p>
+<div class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> List</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> generate_opt_design(time_horizon: <span class="bu">int</span>, m: <span class="bu">int</span>) <span class="op">-&gt;</span> List[<span class="bu">int</span>]:</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> time_horizon <span class="op">&gt;</span> <span class="dv">0</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> m <span class="op">&gt;</span> <span class="dv">0</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    randomization_points <span class="op">=</span> [<span class="dv">0</span>] <span class="op">+</span> <span class="bu">list</span>(<span class="bu">range</span>(<span class="dv">2</span> <span class="op">*</span> m, time_horizon <span class="op">-</span> <span class="dv">2</span> <span class="op">*</span> m <span class="op">+</span> <span class="dv">1</span>, m))</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> randomization_points</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> generate_naive_design(time_horizon: <span class="bu">int</span>, m: <span class="bu">int</span>) <span class="op">-&gt;</span> List[<span class="bu">int</span>]:</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> time_horizon <span class="op">&gt;</span> <span class="dv">0</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> m <span class="op">&gt;=</span> <span class="dv">0</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">list</span>(<span class="bu">range</span>(<span class="dv">0</span>, time_horizon, m <span class="op">+</span> <span class="dv">1</span>))</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> generate_assignment_path(randomization_points: List[<span class="bu">int</span>], time_horizon: <span class="bu">int</span>, m: <span class="bu">int</span>, p: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.5</span>) <span class="op">-&gt;</span> (List[<span class="bu">int</span>], List[<span class="bu">int</span>]):</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="bu">len</span>(randomization_points) <span class="op">&gt;</span> <span class="dv">0</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> time_horizon <span class="op">&gt;</span> <span class="dv">0</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> m <span class="op">&gt;=</span> <span class="dv">0</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> p <span class="op">&gt;</span> <span class="fl">0.0</span> <span class="kw">and</span> p <span class="op">&lt;</span> <span class="fl">1.0</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>    randomization_points <span class="op">=</span> <span class="bu">list</span>(randomization_points) <span class="op">+</span> [time_horizon]</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>    assignment_paths <span class="op">=</span> []</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, <span class="bu">len</span>(randomization_points)):</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>        assignment <span class="op">=</span> <span class="dv">1</span> <span class="cf">if</span> random.uniform(<span class="fl">0.0</span>, <span class="fl">1.0</span>) <span class="op">&lt;</span> p <span class="cf">else</span> <span class="dv">0</span></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(randomization_points[i <span class="op">-</span> <span class="dv">1</span>], randomization_points[i]):</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>            assignment_paths.append(assignment)</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> assignment_paths</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a><span class="co"># generate_opt_design(12, 2)</span></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a><span class="co"># generate_naive_design(12, 2)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="实验处理效应估计" class="level3">
+<h3 class="anchored" data-anchor-id="实验处理效应估计">实验处理效应估计</h3>
+<p>在@bojinov2023design 的2.4, 基于Horvitz-Thompson估计，m阶(原文中的lag-<em>p</em> effect)的处理效应的公式如下:</p>
+<p><span class="math display">\[
+\hat{\tau_p}(\eta_T, \omega_{1:T}, Y) = \frac{1}{T - m}(Y_{t}^{obs} * \sum_{t = m}^{T - 1}( \frac{\mathbb{1}{(W_{t - m: t} = \mathbb{1}_{m + 1})}}{Pr(W_{t - m: t} = \mathbb{1}_{m + 1})} - Y_{t}^{obs} * \frac{\mathbb{1}{(W_{t - m: t} = \mathbb{0}_{m + 1})}}{Pr(W_{t - m: t} = \mathbb{0}_{m + 1})}))
+\]</span></p>
+<ul>
+<li>其中<span class="math inline">\(\tau_p\)</span>是随机点，上文的randomization_points</li>
+<li><span class="math inline">\(\omega_{1:T}\)</span>是各个时间片的分组，上文的assignment_paths</li>
+<li>这个估计是非参的：它并没有假设m阶的具体的函数形式</li>
+</ul>
+<p>看起来有点复杂，我们从一个具体的例子来看, 假设有6个时间片, m = 1, 实验组占比p = 0.4（注：以下所有设计到第x个的地方都是从0开始）</p>
+<ul>
+<li>随机点randomization_points = [0, 3, 5], 抛三次硬币的结果分别是[1, 0, 0], 6个时间片的分组分别是[1, 1, 1, 0, 0, 0]</li>
+<li>观察到各个时间片的指标数y是[1.2, 2.1, 3.0, 2.0, 0.5, 1.6]</li>
+<li><span class="math inline">\(\tau\)</span>的估计只考虑从当前时间片向前推m个窗口连续是1/0的窗口, 所有6个窗口分别是[nan, 1, 1, nan, 0, 0], 因为第二位和第三位(从0开始)不全是0，或者1，所有第三个是nan</li>
+<li>6个窗口对应的 <span class="math inline">\(Pr(W_{t - m: t}\)</span> 分别是[nan, 0.4, 0.4, nan, 0.6, 0.36], 第5个窗口是0.36，因为它需要第一次抛硬币的结果和第二次都是对照组</li>
+<li><span class="math inline">\(\tau = \frac{1}{6 - 1} * (2.1 / 0.4 + 3.0 / 0.4 - 0.5 / 0.4 - 1.6 / 0.36) = 1.41\)</span>, nan对应的窗口对应的数据会直接抛弃</li>
+</ul>
+<div class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> List</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> estimate_tau(</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    randomization_points: List[<span class="bu">int</span>],</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    assignment_path: List[<span class="bu">int</span>],</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    potential_outcome_path: List[<span class="bu">float</span>],</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    m: <span class="bu">int</span>,</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    p: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.5</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>) <span class="op">-&gt;</span> (<span class="bu">float</span>, <span class="bu">float</span>, <span class="bu">float</span>, <span class="bu">float</span>, <span class="bu">float</span>):</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="bu">len</span>(randomization_points) <span class="op">&lt;=</span> <span class="bu">len</span>(assignment_path)</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="bu">len</span>(assignment_path) <span class="op">==</span> <span class="bu">len</span>(potential_outcome_path)</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    time_horizon <span class="op">=</span> <span class="bu">len</span>(assignment_path)</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    randomization_points_withend <span class="op">=</span> randomization_points <span class="op">+</span> [time_horizon]</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    randomization_ids <span class="op">=</span> []  <span class="co"># 每个时间片对应的随机数的id</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">0</span>, <span class="bu">len</span>(randomization_points)):</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(randomization_points_withend[i], randomization_points_withend[i <span class="op">+</span> <span class="dv">1</span>]):</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>            randomization_ids.append(i)</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    y_trt, y_ctl, n_trt, n_ctl <span class="op">=</span> <span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> t <span class="kw">in</span> <span class="bu">range</span>(m, time_horizon):</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>        (beg, end) <span class="op">=</span> (t <span class="op">-</span> m, t <span class="op">+</span> <span class="dv">1</span>)</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>        wsum <span class="op">=</span> <span class="bu">sum</span>(assignment_path[beg:end])</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>        <span class="co"># 窗口内涉及到的随机数id的个数</span></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>        randomization_cnt <span class="op">=</span> <span class="bu">len</span>(<span class="bu">set</span>(randomization_ids[beg:end])) </span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> wsum <span class="op">==</span> (m <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>            ps <span class="op">=</span> p <span class="op">**</span> randomization_cnt</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>            y_trt <span class="op">+=</span> potential_outcome_path[t] <span class="op">/</span> ps</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>            n_trt <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>        <span class="cf">elif</span> wsum <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>            ps <span class="op">=</span> (<span class="fl">1.0</span> <span class="op">-</span> p) <span class="op">**</span> randomization_cnt</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>            y_ctl <span class="op">+=</span> potential_outcome_path[t] <span class="op">/</span> ps</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>            n_ctl <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>            <span class="cf">pass</span></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    n <span class="op">=</span> (<span class="bu">len</span>(assignment_path) <span class="op">-</span> m)</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>    tau <span class="op">=</span> y_trt <span class="op">/</span> n <span class="op">-</span> y_ctl <span class="op">/</span> n</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (tau, y_trt <span class="op">/</span> n, y_ctl <span class="op">/</span> n, n_trt, n_ctl)</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a><span class="co"># randomization_points = [0, 3, 5]</span></span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a><span class="co"># assignment_path = [1, 1, 1, 0, 0, 0]</span></span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a><span class="co"># potential_outcome_path = [1.2, 2.1, 3.0, 2.0, 0.5, 1.6]</span></span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a><span class="co"># m = 1</span></span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a><span class="co"># p = 0.4</span></span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a><span class="co"># estimate_tau(randomization_points, assignment_path, potential_outcome_path, m, p)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>在 <span class="citation" data-cites="bojinov2023design">@bojinov2023design</span> 的4.2，作者给出了在最优设计下的两种估计方差的公式。这两个公式都比较保守（比实际方差大），相应的代码实现如下</p>
+<div class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> List</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> generate_ub_variance_opt_design(</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    randomization_points: List[<span class="bu">int</span>],</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    assignment_path: List[<span class="bu">int</span>],</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    potential_outcome_path: List[<span class="bu">float</span>],</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    m: <span class="bu">int</span>,</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    upper_bound_type: <span class="bu">int</span> <span class="op">=</span> <span class="dv">2</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>) <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    num_randomizations <span class="op">=</span> <span class="bu">len</span>(randomization_points)</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    observed_chunks <span class="op">=</span> [<span class="bu">sum</span>(potential_outcome_path[(i <span class="op">*</span> m <span class="op">+</span> <span class="dv">2</span>):((i <span class="op">+</span> <span class="dv">1</span>) <span class="op">*</span> m <span class="op">+</span> <span class="dv">2</span>)]) <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(num_randomizations <span class="op">+</span> <span class="dv">1</span>)]</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> upper_bound_type <span class="op">==</span> <span class="dv">1</span>:</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>        variance <span class="op">=</span> <span class="dv">6</span> <span class="op">*</span> observed_chunks[<span class="dv">0</span>] <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> <span class="dv">6</span> <span class="op">*</span> observed_chunks[num_randomizations] <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, num_randomizations):</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> assignment_path[k <span class="op">*</span> m] <span class="op">==</span> assignment_path[(k <span class="op">+</span> <span class="dv">1</span>) <span class="op">*</span> m]:</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>                variance <span class="op">+=</span> <span class="fl">24.0</span> <span class="op">*</span> observed_chunks[k] <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(num_randomizations):</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> (assignment_path[k <span class="op">*</span> m] <span class="op">==</span> assignment_path[(k <span class="op">+</span> <span class="dv">1</span>) <span class="op">*</span> m] <span class="kw">and</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>                    assignment_path[(k <span class="op">+</span> <span class="dv">2</span>) <span class="op">*</span> m] <span class="op">==</span> assignment_path[(k <span class="op">+</span> <span class="dv">1</span>) <span class="op">*</span> m]):</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>                variance <span class="op">+=</span> <span class="fl">16.0</span> <span class="op">*</span> observed_chunks[k] <span class="op">*</span> observed_chunks[k <span class="op">+</span> <span class="dv">1</span>]</span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>                </span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> upper_bound_type <span class="op">==</span> <span class="dv">2</span>:</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>        variance <span class="op">=</span> <span class="dv">8</span> <span class="op">*</span> observed_chunks[<span class="dv">0</span>] <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> <span class="dv">8</span> <span class="op">*</span> observed_chunks[num_randomizations] <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, num_randomizations):</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> assignment_path[k <span class="op">*</span> m] <span class="op">==</span> assignment_path[(k <span class="op">+</span> <span class="dv">1</span>) <span class="op">*</span> m]:</span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>                variance <span class="op">+=</span> <span class="dv">32</span> <span class="op">*</span> observed_chunks[k] <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>        <span class="cf">raise</span> <span class="pp">ValueError</span>(<span class="st">"upper_bound_type in (1, 2)"</span>)</span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> variance <span class="op">/</span> ((time_horizon <span class="op">-</span> m) <span class="op">**</span> <span class="dv">2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>有了处理效应和相应的方差，可以构建置信区间和相应的p值等。</p>
+<p>另外，也可以根据fisher检验的逻辑计算p值。这个逻辑比较直接，下面直接上代码</p>
+<div class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> List</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> fisher_test_switchback(</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    randomization_points: List[<span class="bu">int</span>], </span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    assignment_path: List[<span class="bu">int</span>],</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    potential_outcome_path: List[<span class="bu">float</span>],</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    m: <span class="bu">int</span>,</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    permutations: <span class="bu">int</span> <span class="op">=</span> <span class="dv">10000</span>,</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    alternative: <span class="bu">str</span> <span class="op">=</span> <span class="st">'two-sided'</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>) <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> m <span class="op">&gt;=</span> <span class="dv">0</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> p <span class="op">&gt;</span> <span class="fl">0.0</span> <span class="kw">and</span> p <span class="op">&lt;</span> <span class="fl">1.0</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> permutations <span class="op">&gt;</span> <span class="dv">0</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> alternative <span class="kw">in</span> [<span class="st">'two-sided'</span>, <span class="st">'greater'</span>, <span class="st">'less'</span>]</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>    randomization_points <span class="op">=</span> generate_opt_design(time_horizon, m)</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>    realized_tau <span class="op">=</span> estimate_tau(randomization_points, assignment_path, potential_outcome_path, m, p)[<span class="dv">0</span>]</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>    p_value <span class="op">=</span> <span class="fl">0.0</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(permutations):</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>        sim_assignment_path <span class="op">=</span> generate_assignment_path(randomization_points, time_horizon, m, p)</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>        sim_tau <span class="op">=</span> estimate_tau(randomization_points, sim_assignment_path, potential_outcome_path, m, p)[<span class="dv">0</span>]</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> alternative <span class="op">==</span> <span class="st">'two-sided'</span> <span class="kw">and</span> <span class="bu">abs</span>(sim_tau) <span class="op">&gt;</span> <span class="bu">abs</span>(realized_tau):</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>            p_value <span class="op">+=</span> <span class="fl">1.0</span></span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>        <span class="cf">elif</span> alternative <span class="op">==</span> <span class="st">'greater'</span> <span class="kw">and</span> sim_tau <span class="op">&gt;</span> realized_tau:</span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>            p_value <span class="op">+=</span> <span class="fl">1.0</span></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>        <span class="cf">elif</span> alternative <span class="op">==</span> <span class="st">'less'</span> <span class="kw">and</span> sim_tau <span class="op">&lt;</span> realized_tau:</span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>            p_value <span class="op">+=</span> <span class="fl">1.0</span></span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> p_value <span class="op">/</span> permutations</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>把处理效应和方差估计整合起来，可以给出最终的结果</p>
+<div class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> scipy</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> dataclass</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> List</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> SwitchbackTestRes:</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    m: <span class="bu">int</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    time_horizon: <span class="bu">int</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    tau: <span class="bu">float</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    treat_mean: <span class="bu">float</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    control_mean: <span class="bu">float</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    treat_cnt: <span class="bu">int</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    control_cnt: <span class="bu">int</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    stderr: <span class="bu">float</span> <span class="op">=</span> <span class="bu">float</span>(<span class="st">'nan'</span>)</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>    p_value: <span class="bu">float</span> <span class="op">=</span> <span class="bu">float</span>(<span class="st">'nan'</span>)</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    p: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.5</span>,</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>    alternative: <span class="bu">str</span> <span class="op">=</span> <span class="st">'two-sided'</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>    permutations: <span class="bu">int</span> <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>    confidence_level: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.95</span>,</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    upper_bound_type: <span class="bu">int</span> <span class="op">=</span> <span class="dv">2</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__repr__</span>(<span class="va">self</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>        smy <span class="op">=</span> <span class="ss">f"""</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a><span class="ss">        time_horizon: </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>time_horizon<span class="sc">}</span><span class="ss">, carryover order: </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>m<span class="sc">}</span><span class="ss">, treat prob: </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>p<span class="sc">}</span></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a><span class="ss">        tau: </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>tau<span class="sc">}</span><span class="ss">, sample treat mean: </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>treat_mean<span class="sc">}</span><span class="ss">, sample control_mean: </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>control_mean<span class="sc">}</span><span class="ss">,</span></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a><span class="ss">        valid treat window: </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>treat_cnt<span class="sc">}</span><span class="ss">, valid control window: </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>control_cnt<span class="sc">}</span></span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a><span class="ss">        alternative hypothesis: true difference in means is </span><span class="sc">{</span><span class="st">'not equal to'</span> <span class="cf">if</span> <span class="va">self</span><span class="sc">.</span>alternative <span class="op">==</span> <span class="st">'two-sided'</span> <span class="cf">else</span> <span class="va">self</span><span class="sc">.</span>alternative <span class="op">+</span> <span class="st">' than'</span><span class="sc">}</span><span class="ss"> 0</span></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a><span class="ss">        """</span></span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.permutations <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>            smy <span class="op">+=</span> <span class="ss">f"""</span></span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a><span class="ss">            use fisher test, permutations: </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>permutations<span class="sc">}</span></span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a><span class="ss">            p value: </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>p_value<span class="sc">}</span></span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a><span class="ss">            """</span></span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a>            q <span class="op">=</span> scipy.stats.norm.cdf(<span class="va">self</span>.tau <span class="op">/</span> <span class="va">self</span>.stderr)</span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="va">self</span>.alternative <span class="op">==</span> <span class="st">'two-sided'</span>:</span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>                <span class="va">self</span>.p_value <span class="op">=</span> <span class="fl">2.0</span> <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> q)</span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>            <span class="cf">elif</span> <span class="va">self</span>.alternative <span class="op">==</span> <span class="st">'greater'</span>:</span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>                <span class="va">self</span>.p_value <span class="op">=</span> <span class="fl">1.0</span> <span class="op">-</span> q</span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>            <span class="cf">elif</span> <span class="va">self</span>.alternative <span class="op">==</span> <span class="st">'less'</span>:</span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a>                <span class="va">self</span>.p_value <span class="op">=</span> q</span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a>            smy <span class="op">+=</span> <span class="ss">f"""</span></span>
+<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a><span class="ss">            use neyman test, std err: </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>stderr<span class="sc">}</span></span>
+<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a><span class="ss">            p value: </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>p_value<span class="sc">}</span></span>
+<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a><span class="ss">            """</span></span>
+<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a>            d <span class="op">=</span> <span class="op">-</span>scipy.stats.norm.ppf((<span class="fl">1.0</span> <span class="op">-</span> <span class="va">self</span>.confidence_level) <span class="op">/</span> <span class="fl">2.0</span>)</span>
+<span id="cb5-49"><a href="#cb5-49" aria-hidden="true" tabindex="-1"></a>            smy <span class="op">+=</span> <span class="ss">f"""</span></span>
+<span id="cb5-50"><a href="#cb5-50" aria-hidden="true" tabindex="-1"></a><span class="ss">            upper_bound_type: </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>upper_bound_type<span class="sc">}</span></span>
+<span id="cb5-51"><a href="#cb5-51" aria-hidden="true" tabindex="-1"></a><span class="ss">            </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>confidence_level <span class="op">*</span> <span class="dv">100</span><span class="sc">}</span><span class="ss"> percent confidence interval: [</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>tau <span class="op">-</span> d <span class="op">*</span> <span class="va">self</span><span class="sc">.</span>stderr<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>tau <span class="op">+</span> d <span class="op">*</span> <span class="va">self</span><span class="sc">.</span>stderr<span class="sc">}</span><span class="ss">]</span></span>
+<span id="cb5-52"><a href="#cb5-52" aria-hidden="true" tabindex="-1"></a><span class="ss">            """</span></span>
+<span id="cb5-53"><a href="#cb5-53" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"</span><span class="ch">\n</span><span class="st">"</span>.join([line.lstrip() <span class="cf">for</span> line <span class="kw">in</span> smy.split(<span class="st">"</span><span class="ch">\n</span><span class="st">"</span>)])</span>
+<span id="cb5-54"><a href="#cb5-54" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb5-55"><a href="#cb5-55" aria-hidden="true" tabindex="-1"></a><span class="co"># SwitchbackTestRes(2, 120, 3.0, 8.4, 5.4, 20, 18, 1.9)</span></span>
+<span id="cb5-56"><a href="#cb5-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-57"><a href="#cb5-57" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> switchback_test(</span>
+<span id="cb5-58"><a href="#cb5-58" aria-hidden="true" tabindex="-1"></a>    randomization_points: List[<span class="bu">int</span>],</span>
+<span id="cb5-59"><a href="#cb5-59" aria-hidden="true" tabindex="-1"></a>    assignment_path: List[<span class="bu">int</span>],</span>
+<span id="cb5-60"><a href="#cb5-60" aria-hidden="true" tabindex="-1"></a>    potential_outcome_path: List[<span class="bu">float</span>],</span>
+<span id="cb5-61"><a href="#cb5-61" aria-hidden="true" tabindex="-1"></a>    m: <span class="bu">int</span>,</span>
+<span id="cb5-62"><a href="#cb5-62" aria-hidden="true" tabindex="-1"></a>    p: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.5</span>,</span>
+<span id="cb5-63"><a href="#cb5-63" aria-hidden="true" tabindex="-1"></a>    alternative: <span class="bu">str</span> <span class="op">=</span> <span class="st">'two-sided'</span>,</span>
+<span id="cb5-64"><a href="#cb5-64" aria-hidden="true" tabindex="-1"></a>    permutations: <span class="bu">int</span> <span class="op">=</span> <span class="dv">0</span>,</span>
+<span id="cb5-65"><a href="#cb5-65" aria-hidden="true" tabindex="-1"></a>    confidence_level: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.95</span>,</span>
+<span id="cb5-66"><a href="#cb5-66" aria-hidden="true" tabindex="-1"></a>    upper_bound_type: <span class="bu">int</span> <span class="op">=</span> <span class="dv">2</span></span>
+<span id="cb5-67"><a href="#cb5-67" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb5-68"><a href="#cb5-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-69"><a href="#cb5-69" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="bu">set</span>(assignment_path) <span class="op">==</span> <span class="bu">set</span>([<span class="dv">0</span>, <span class="dv">1</span>])</span>
+<span id="cb5-70"><a href="#cb5-70" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> m <span class="op">&gt;=</span> <span class="dv">0</span></span>
+<span id="cb5-71"><a href="#cb5-71" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> p <span class="op">&gt;</span> <span class="fl">0.0</span> <span class="kw">and</span> p <span class="op">&lt;</span> <span class="fl">1.0</span></span>
+<span id="cb5-72"><a href="#cb5-72" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> alternative <span class="kw">in</span> [<span class="st">'two-sided'</span>, <span class="st">'greater'</span>, <span class="st">'less'</span>]</span>
+<span id="cb5-73"><a href="#cb5-73" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> permutations <span class="op">&gt;=</span> <span class="dv">0</span></span>
+<span id="cb5-74"><a href="#cb5-74" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> confidence_level <span class="op">&gt;</span> <span class="fl">0.0</span> <span class="kw">and</span> confidence_level <span class="op">&lt;</span> <span class="fl">1.0</span></span>
+<span id="cb5-75"><a href="#cb5-75" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> upper_bound_type <span class="kw">in</span> [<span class="dv">1</span>, <span class="dv">2</span>]</span>
+<span id="cb5-76"><a href="#cb5-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-77"><a href="#cb5-77" aria-hidden="true" tabindex="-1"></a>    (tau, m_trt, m_ctl, n_trt, n_ctl) <span class="op">=</span> estimate_tau(randomization_points, assignment_path, potential_outcome_path, m, p)</span>
+<span id="cb5-78"><a href="#cb5-78" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb5-79"><a href="#cb5-79" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> permutations <span class="op">&lt;=</span> <span class="dv">0</span>:</span>
+<span id="cb5-80"><a href="#cb5-80" aria-hidden="true" tabindex="-1"></a>        var <span class="op">=</span> generate_ub_variance_opt_design(randomization_points, assignment_path, potential_outcome_path, m, upper_bound_type)</span>
+<span id="cb5-81"><a href="#cb5-81" aria-hidden="true" tabindex="-1"></a>        stderr <span class="op">=</span> math.sqrt(var)</span>
+<span id="cb5-82"><a href="#cb5-82" aria-hidden="true" tabindex="-1"></a>        p_value <span class="op">=</span> <span class="bu">float</span>(<span class="st">'nan'</span>)</span>
+<span id="cb5-83"><a href="#cb5-83" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>: </span>
+<span id="cb5-84"><a href="#cb5-84" aria-hidden="true" tabindex="-1"></a>        stderr <span class="op">=</span> <span class="bu">float</span>(<span class="st">'nan'</span>)</span>
+<span id="cb5-85"><a href="#cb5-85" aria-hidden="true" tabindex="-1"></a>        p_value <span class="op">=</span> fisher_test_switchback(randomization_points, assignment_path, potential_outcome_path, m, permutations, alternative)</span>
+<span id="cb5-86"><a href="#cb5-86" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb5-87"><a href="#cb5-87" aria-hidden="true" tabindex="-1"></a>    time_horizon <span class="op">=</span> <span class="bu">len</span>(assignment_path) </span>
+<span id="cb5-88"><a href="#cb5-88" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> SwitchbackTestRes(</span>
+<span id="cb5-89"><a href="#cb5-89" aria-hidden="true" tabindex="-1"></a>      m, time_horizon, tau, m_trt, m_ctl, n_trt, n_ctl, stderr, p_value, p,</span>
+<span id="cb5-90"><a href="#cb5-90" aria-hidden="true" tabindex="-1"></a>      alternative, permutations, confidence_level, upper_bound_type</span>
+<span id="cb5-91"><a href="#cb5-91" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb5-92"><a href="#cb5-92" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-93"><a href="#cb5-93" aria-hidden="true" tabindex="-1"></a><span class="co"># time_horizon = 120</span></span>
+<span id="cb5-94"><a href="#cb5-94" aria-hidden="true" tabindex="-1"></a><span class="co"># m = 2</span></span>
+<span id="cb5-95"><a href="#cb5-95" aria-hidden="true" tabindex="-1"></a><span class="co"># p = 0.5</span></span>
+<span id="cb5-96"><a href="#cb5-96" aria-hidden="true" tabindex="-1"></a><span class="co"># randomization_points = generate_opt_design(time_horizon, m)</span></span>
+<span id="cb5-97"><a href="#cb5-97" aria-hidden="true" tabindex="-1"></a><span class="co"># assignment_path = generate_assignment_path(randomization_points, time_horizon, m)</span></span>
+<span id="cb5-98"><a href="#cb5-98" aria-hidden="true" tabindex="-1"></a><span class="co"># potential_outcome_path = generate_outcome(assignment_path, [1.0, 1.0, 1.0])</span></span>
+<span id="cb5-99"><a href="#cb5-99" aria-hidden="true" tabindex="-1"></a><span class="co"># switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p)</span></span>
+<span id="cb5-100"><a href="#cb5-100" aria-hidden="true" tabindex="-1"></a><span class="co"># switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, permutations = 1000)</span></span>
+<span id="cb5-101"><a href="#cb5-101" aria-hidden="true" tabindex="-1"></a><span class="co"># switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'two-sided', confidence_level = 0.90, upper_bound_type = 1)</span></span>
+<span id="cb5-102"><a href="#cb5-102" aria-hidden="true" tabindex="-1"></a><span class="co"># switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'less')</span></span>
+<span id="cb5-103"><a href="#cb5-103" aria-hidden="true" tabindex="-1"></a><span class="co"># switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'greater'</span></span>
+<span id="cb5-104"><a href="#cb5-104" aria-hidden="true" tabindex="-1"></a><span class="co"># switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'two-sided', permutations = 1000)</span></span>
+<span id="cb5-105"><a href="#cb5-105" aria-hidden="true" tabindex="-1"></a><span class="co"># switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'less', permutations = 1000)</span></span>
+<span id="cb5-106"><a href="#cb5-106" aria-hidden="true" tabindex="-1"></a><span class="co"># switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'greater', permutations = 1000)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+</section>
+<section id="在线demo" class="level2">
+<h2 class="anchored" data-anchor-id="在线demo">在线demo</h2>
+<pre class="shinylive-python" data-engine="python"><code>#| components: [editor, cell]
+
+import random
+import math
+import scipy
+from dataclasses import dataclass
+from typing import List
+
+
+def generate_opt_design(time_horizon: int, m: int) -&gt; List[int]:
+    assert time_horizon &gt; 0
+    assert m &gt; 0
+
+    randomization_points = [0] + list(range(2 * m, time_horizon - 2 * m + 1, m))
+    return randomization_points
+
+
+def generate_naive_design(time_horizon: int, m: int) -&gt; List[int]:
+    assert time_horizon &gt; 0
+    assert m &gt;= 0
+
+    return list(range(0, time_horizon, m + 1))
+
+
+def generate_assignment_path(randomization_points: List[int], time_horizon: int, m: int, p: float = 0.5) -&gt; (List[int], List[int]):
+    assert len(randomization_points) &gt; 0
+
+    assert time_horizon &gt; 0
+    assert m &gt;= 0
+    assert p &gt; 0.0 and p &lt; 1.0
+
+    randomization_points = list(randomization_points) + [time_horizon]
+    assignment_paths = []
+    for i in range(1, len(randomization_points)):
+        assignment = 1 if random.uniform(0.0, 1.0) &lt; p else 0
+        for j in range(randomization_points[i - 1], randomization_points[i]):
+            assignment_paths.append(assignment)
+    return assignment_paths
+
+def estimate_tau(
+    randomization_points: List[int],
+    assignment_path: List[int],
+    potential_outcome_path: List[float],
+    m: int,
+    p: float = 0.5
+) -&gt; (float, float, float, float, float):
+
+    assert len(randomization_points) &lt;= len(assignment_path)
+    assert len(assignment_path) == len(potential_outcome_path)
+
+    time_horizon = len(assignment_path)
+    randomization_points_withend = randomization_points + [time_horizon]
+    randomization_ids = []  # 每个时间片对应的随机数的id
+    for i in range(0, len(randomization_points)):
+        for j in range(randomization_points_withend[i], randomization_points_withend[i + 1]):
+            randomization_ids.append(i)
+
+    y_trt, y_ctl, n_trt, n_ctl = 0.0, 0.0, 0.0, 0.0
+    for t in range(m, time_horizon):
+        (beg, end) = (t - m, t + 1)
+        wsum = sum(assignment_path[beg:end])
+        # 窗口内涉及到的随机数id的个数
+        randomization_cnt = len(set(randomization_ids[beg:end])) 
+        if wsum == (m + 1):
+            ps = p ** randomization_cnt
+            y_trt += potential_outcome_path[t] / ps
+            n_trt += 1
+        elif wsum == 0:
+            ps = (1.0 - p) ** randomization_cnt
+            y_ctl += potential_outcome_path[t] / ps
+            n_ctl += 1
+        else:
+            pass
+    n = (len(assignment_path) - m)
+    tau = y_trt / n - y_ctl / n
+    return (tau, y_trt / n, y_ctl / n, n_trt, n_ctl)
+
+def fisher_test_switchback(
+    randomization_points: List[int], 
+    assignment_path: List[int],
+    potential_outcome_path: List[float],
+    m: int,
+    permutations: int = 10000,
+    alternative: str = 'two-sided'
+) -&gt; float:
+    assert m &gt;= 0
+    assert p &gt; 0.0 and p &lt; 1.0
+    assert permutations &gt; 0
+    assert alternative in ['two-sided', 'greater', 'less']
+
+    randomization_points = generate_opt_design(time_horizon, m)
+    realized_tau = estimate_tau(randomization_points, assignment_path, potential_outcome_path, m, p)[0]
+    p_value = 0.0
+
+    for i in range(permutations):
+        sim_assignment_path = generate_assignment_path(randomization_points, time_horizon, m, p)
+        sim_tau = estimate_tau(randomization_points, sim_assignment_path, potential_outcome_path, m, p)[0]
+        if alternative == 'two-sided' and abs(sim_tau) &gt; abs(realized_tau):
+            p_value += 1.0
+        elif alternative == 'greater' and sim_tau &gt; realized_tau:
+            p_value += 1.0
+        elif alternative == 'less' and sim_tau &lt; realized_tau:
+            p_value += 1.0
+    return p_value / permutations
+
+def generate_ub_variance_opt_design(
+    randomization_points: List[int],
+    assignment_path: List[int],
+    potential_outcome_path: List[float],
+    m: int,
+    upper_bound_type: int = 2
+) -&gt; float:
+
+    num_randomizations = len(randomization_points)
+    observed_chunks = [sum(potential_outcome_path[(i * m + 2):((i + 1) * m + 2)]) for i in range(num_randomizations + 1)]
+
+    if upper_bound_type == 1:
+        variance = 6 * observed_chunks[0] ** 2 + 6 * observed_chunks[num_randomizations] ** 2
+        for k in range(1, num_randomizations):
+            if assignment_path[k * m] == assignment_path[(k + 1) * m]:
+                variance += 24.0 * observed_chunks[k] ** 2
+
+        for k in range(num_randomizations):
+            if (assignment_path[k * m] == assignment_path[(k + 1) * m] and
+                    assignment_path[(k + 2) * m] == assignment_path[(k + 1) * m]):
+                variance += 16.0 * observed_chunks[k] * observed_chunks[k + 1]
+                
+    elif upper_bound_type == 2:
+        variance = 8 * observed_chunks[0] ** 2 + 8 * observed_chunks[num_randomizations] ** 2
+        for k in range(1, num_randomizations):
+            if assignment_path[k * m] == assignment_path[(k + 1) * m]:
+                variance += 32 * observed_chunks[k] ** 2
+    else:
+        raise ValueError("upper_bound_type in (1, 2)")
+
+    return variance / ((time_horizon - m) ** 2)
+
+def fisher_test_switchback(
+    randomization_points: List[int], 
+    assignment_path: List[int],
+    potential_outcome_path: List[float],
+    m: int,
+    permutations: int = 10000,
+    alternative: str = 'two-sided'
+) -&gt; float:
+    assert m &gt;= 0
+    assert p &gt; 0.0 and p &lt; 1.0
+    assert permutations &gt; 0
+    assert alternative in ['two-sided', 'greater', 'less']
+
+    randomization_points = generate_opt_design(time_horizon, m)
+    realized_tau = estimate_tau(randomization_points, assignment_path, potential_outcome_path, m, p)[0]
+    p_value = 0.0
+
+    for i in range(permutations):
+        sim_assignment_path = generate_assignment_path(randomization_points, time_horizon, m, p)
+        sim_tau = estimate_tau(randomization_points, sim_assignment_path, potential_outcome_path, m, p)[0]
+        if alternative == 'two-sided' and abs(sim_tau) &gt; abs(realized_tau):
+            p_value += 1.0
+        elif alternative == 'greater' and sim_tau &gt; realized_tau:
+            p_value += 1.0
+        elif alternative == 'less' and sim_tau &lt; realized_tau:
+            p_value += 1.0
+    return p_value / permutations
+
+@dataclass
+class SwitchbackTestRes:
+    m: int
+    time_horizon: int
+    tau: float
+    treat_mean: float
+    control_mean: float
+    treat_cnt: int
+    control_cnt: int
+    stderr: float = float('nan')
+    p_value: float = float('nan')
+    p: float = 0.5,
+    alternative: str = 'two-sided'
+    permutations: int = 0
+    confidence_level: float = 0.95,
+    upper_bound_type: int = 2
+
+    def __repr__(self) -&gt; str:
+        smy = f"""
+        time_horizon: {self.time_horizon}, carryover order: {self.m}, treat prob: {self.p}
+        tau: {self.tau}, sample treat mean: {self.treat_mean}, sample control_mean: {self.control_mean},
+        valid treat window: {self.treat_cnt}, valid control window: {self.control_cnt}
+        alternative hypothesis: true difference in means is {'not equal to' if self.alternative == 'two-sided' else self.alternative + ' than'} 0
+        """
+
+        if self.permutations &gt; 0:
+            smy += f"""
+            use fisher test, permutations: {self.permutations}
+            p value: {self.p_value}
+            """
+        else:
+            q = scipy.stats.norm.cdf(self.tau / self.stderr)
+            if self.alternative == 'two-sided':
+                self.p_value = 2.0 * (1.0 - q)
+            elif self.alternative == 'greater':
+                self.p_value = 1.0 - q
+            elif self.alternative == 'less':
+                self.p_value = q
+            smy += f"""
+            use neyman test, std err: {self.stderr}
+            p value: {self.p_value}
+            """
+
+            d = -scipy.stats.norm.ppf((1.0 - self.confidence_level) / 2.0)
+            smy += f"""
+            upper_bound_type: {self.upper_bound_type}
+            {self.confidence_level * 100} percent confidence interval: [{self.tau - d * self.stderr}, {self.tau + d * self.stderr}]
+            """
+        return "\n".join([line.lstrip() for line in smy.split("\n")])
+
+def switchback_test(
+    randomization_points: List[int],
+    assignment_path: List[int],
+    potential_outcome_path: List[float],
+    m: int,
+    p: float = 0.5,
+    alternative: str = 'two-sided',
+    permutations: int = 0,
+    confidence_level: float = 0.95,
+    upper_bound_type: int = 2
+):
+
+    assert set(assignment_path) == set([0, 1])
+    assert m &gt;= 0
+    assert p &gt; 0.0 and p &lt; 1.0
+    assert alternative in ['two-sided', 'greater', 'less']
+    assert permutations &gt;= 0
+    assert confidence_level &gt; 0.0 and confidence_level &lt; 1.0
+    assert upper_bound_type in [1, 2]
+
+    (tau, m_trt, m_ctl, n_trt, n_ctl) = estimate_tau(randomization_points, assignment_path, potential_outcome_path, m, p)
+    
+    if permutations &lt;= 0:
+        var = generate_ub_variance_opt_design(randomization_points, assignment_path, potential_outcome_path, m, upper_bound_type)
+        stderr = math.sqrt(var)
+        p_value = float('nan')
+    else: 
+        stderr = float('nan')
+        p_value = fisher_test_switchback(randomization_points, assignment_path, potential_outcome_path, m, permutations, alternative)
+    
+    time_horizon = len(assignment_path) 
+    return SwitchbackTestRes(
+      m, time_horizon, tau, m_trt, m_ctl, n_trt, n_ctl, stderr, p_value, p,
+      alternative, permutations, confidence_level, upper_bound_type
+    )
+
+def generate_outcome(assignment_path: List[int], tau: List[float], mu: float = 0.0) -&gt; List[float]:
+
+    assert len(tau) &gt; 0, 'tau is empty'
+    assert len(assignment_path) &gt;= len(tau), 'delta is longer then assign path'
+
+    time_horizon = len(assignment_path)
+    carryover_order = len(tau)
+    ret = list()
+    for t in range(time_horizon):
+        alpht_t = math.log(t + 1)  # fixed effect associated to period t
+        epsilon = random.gauss(0.0, 1.0)  # random noise in period t
+        contemporaneous_carryover_effect = sum(
+            tau[i] * assignment_path[t - i] for i in range(min(carryover_order, t)))
+        y = mu + alpht_t + contemporaneous_carryover_effect + epsilon
+        ret.append(y)
+    return ret
+
+random.seed(0)
+
+time_horizon = 120
+m = 2
+p = 0.5
+
+randomization_points = generate_opt_design(time_horizon, m) # 最优设计的随机点
+assignment_path = generate_assignment_path(randomization_points, time_horizon, m) # 每个时间片的实验分组
+# 模拟的每个时间片的指标，这里m = 2, 真实的处理效应是3.0, 具体逻辑见附-测试数据的生成
+potential_outcome_path = generate_outcome(assignment_path, [1.0, 1.0, 1.0]) 
+
+switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, permutations = 0) # neyman asymptotic inference
+switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, permutations = 1000) # fisher exact inference
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'two-sided', confidence_level = 0.90, upper_bound_type = 1)
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'less')
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'greater'
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'two-sided', permutations = 1000)
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'less', permutations = 1000)
+# switchback_test(randomization_points, assignment_path, potential_outcome_path, m, p, alternative = 'greater', permutations = 1000)
+</code></pre>
+</section>
+<section id="附" class="level1">
+<h1>附</h1>
+<section id="测试数据的生成逻辑" class="level2">
+<h2 class="anchored" data-anchor-id="测试数据的生成逻辑">测试数据的生成逻辑</h2>
+<p>测试数据根据以下公式(<span class="citation" data-cites="bojinov2023design">@bojinov2023design</span> 的6.1的公式(15))生成</p>
+<p><span class="math display">\[
+Y_t(w_{0:t}) = \mu + \alpha_t + \sum_{i = 0}^{min(m, t)}(\delta^{(i)} * w_{t - i}) + \epsilon_t
+\]</span></p>
+<div class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> List</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> generate_outcome(assignment_path: List[<span class="bu">int</span>], tau: List[<span class="bu">float</span>], mu: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.0</span>) <span class="op">-&gt;</span> List[<span class="bu">float</span>]:</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="bu">len</span>(tau) <span class="op">&gt;</span> <span class="dv">0</span>, <span class="st">'tau is empty'</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="bu">len</span>(assignment_path) <span class="op">&gt;=</span> <span class="bu">len</span>(tau), <span class="st">'delta is longer then assign path'</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    time_horizon <span class="op">=</span> <span class="bu">len</span>(assignment_path)</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    carryover_order <span class="op">=</span> <span class="bu">len</span>(tau)</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    ret <span class="op">=</span> <span class="bu">list</span>()</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> t <span class="kw">in</span> <span class="bu">range</span>(time_horizon):</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>        alpht_t <span class="op">=</span> math.log(t <span class="op">+</span> <span class="dv">1</span>)  <span class="co"># fixed effect associated to period t</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>        epsilon <span class="op">=</span> random.gauss(<span class="fl">0.0</span>, <span class="fl">1.0</span>)  <span class="co"># random noise in period t</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>        contemporaneous_carryover_effect <span class="op">=</span> <span class="bu">sum</span>(</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>            tau[i] <span class="op">*</span> assignment_path[t <span class="op">-</span> i] <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">min</span>(carryover_order, t)))</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>        y <span class="op">=</span> mu <span class="op">+</span> alpht_t <span class="op">+</span> contemporaneous_carryover_effect <span class="op">+</span> epsilon</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>        ret.append(y)</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> ret</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a><span class="co"># generate_outcome([1, 0, 1, 0], [1.0, 2.0]) </span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="原代码" class="level2">
+<h2 class="anchored" data-anchor-id="原代码">原代码</h2>
+<p><span class="citation" data-cites="bojinov2023design">@bojinov2023design</span> 论文的原代码<a href="https://github.com/jinglongzhao/DASE/tree/main"></a>，有部分小的改动</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co">#| eval: false</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>generate_outcomes <span class="ot">&lt;-</span> <span class="cf">function</span>(assignment.path_) {</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  Y.vec <span class="ot">&lt;-</span> <span class="fu">c</span>()</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  Y.vec<span class="fl">.1</span> <span class="ot">&lt;-</span> mu.fixed.effect <span class="sc">+</span> alpha.fixed.effects[<span class="dv">1</span>] <span class="sc">+</span> delta.coef<span class="fl">.1</span> <span class="sc">*</span> assignment.path_[<span class="dv">1</span>] <span class="sc">+</span> epsilon.noises[<span class="dv">1</span>]</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  Y.vec<span class="fl">.2</span> <span class="ot">&lt;-</span> mu.fixed.effect <span class="sc">+</span> alpha.fixed.effects[<span class="dv">2</span>] <span class="sc">+</span> delta.coef<span class="fl">.1</span> <span class="sc">*</span> assignment.path_[<span class="dv">2</span>] <span class="sc">+</span> delta.coef<span class="fl">.2</span> <span class="sc">*</span> assignment.path_[<span class="dv">1</span>] <span class="sc">+</span> epsilon.noises[<span class="dv">2</span>]</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  Y.vec <span class="ot">&lt;-</span> <span class="fu">c</span>(Y.vec<span class="fl">.1</span>, Y.vec<span class="fl">.2</span>)</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (t.temp <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>time.horizon)</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  {</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    Y.temp <span class="ot">&lt;-</span> mu.fixed.effect <span class="sc">+</span> alpha.fixed.effects[t.temp] <span class="sc">+</span> delta.coef<span class="fl">.1</span> <span class="sc">*</span> assignment.path_[t.temp] <span class="sc">+</span> delta.coef<span class="fl">.2</span> <span class="sc">*</span> assignment.path_[t.temp <span class="sc">-</span> <span class="dv">1</span>] <span class="sc">+</span> delta.coef<span class="fl">.3</span> <span class="sc">*</span> assignment.path_[t.temp <span class="sc">-</span> <span class="dv">2</span>] <span class="sc">+</span> epsilon.noises[t.temp]</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>    Y.vec <span class="ot">&lt;-</span> <span class="fu">c</span>(Y.vec, Y.temp)</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(Y.vec)</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>generate_assignments <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">time.horizon =</span> time.horizon, <span class="at">randomization.points =</span> randomization.points, <span class="at">re.randomization =</span> <span class="cn">FALSE</span>) {</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  K <span class="ot">&lt;-</span> <span class="fu">length</span>(randomization.points)</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># W.at.K.vec = sample(c(0,1), replace=TRUE, size=K)</span></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>  W.at.K.vec <span class="ot">&lt;-</span> <span class="fu">as.numeric</span>(<span class="fu">runif</span>(K) <span class="sc">&lt;</span> <span class="fl">0.5</span>)</span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>  W.vec <span class="ot">&lt;-</span> <span class="fu">c</span>()</span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (K <span class="sc">&gt;</span> <span class="dv">1</span>) {</span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>    <span class="co"># ===When k &lt;= K-1, append the proper assignments during each epoch</span></span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (k.temp <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(K <span class="sc">-</span> <span class="dv">1</span>))</span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>    {</span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>      W.vec <span class="ot">&lt;-</span> <span class="fu">c</span>(W.vec, <span class="fu">rep</span>(W.at.K.vec[k.temp], randomization.points[k.temp <span class="sc">+</span> <span class="dv">1</span>] <span class="sc">-</span> randomization.points[k.temp]))</span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>    <span class="co"># ===When k == K, append the last epoch after the last randomization</span></span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>    W.vec <span class="ot">&lt;-</span> <span class="fu">c</span>(W.vec, <span class="fu">rep</span>(W.at.K.vec[K], time.horizon <span class="sc">+</span> <span class="dv">1</span> <span class="sc">-</span> randomization.points[K]))</span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (K <span class="sc">==</span> <span class="dv">1</span>) {</span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>    W.vec <span class="ot">&lt;-</span> <span class="fu">rep</span>(W.at.K.vec[K], time.horizon <span class="sc">+</span> <span class="dv">1</span> <span class="sc">-</span> randomization.points[K])</span>
+<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (re.randomization <span class="sc">==</span> <span class="cn">TRUE</span>) {</span>
+<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a>    treatment.balance <span class="ot">&lt;-</span> <span class="fu">abs</span>(<span class="fu">sum</span>(W.at.K.vec) <span class="sc">-</span> K <span class="sc">/</span> <span class="dv">2</span>)</span>
+<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a>    <span class="cf">while</span> (treatment.balance <span class="sc">&gt;</span> <span class="dv">2</span>) {</span>
+<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a>      W.at.K.vec <span class="ot">&lt;-</span> <span class="fu">sample</span>(<span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">1</span>), <span class="at">replace =</span> <span class="cn">TRUE</span>, <span class="at">size =</span> K)</span>
+<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a>      W.vec <span class="ot">&lt;-</span> <span class="fu">c</span>()</span>
+<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span> (K <span class="sc">&gt;</span> <span class="dv">1</span>) {</span>
+<span id="cb8-40"><a href="#cb8-40" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ===When k &lt;= K-1, append the proper assignments during each epoch</span></span>
+<span id="cb8-41"><a href="#cb8-41" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> (k.temp <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(K <span class="sc">-</span> <span class="dv">1</span>))</span>
+<span id="cb8-42"><a href="#cb8-42" aria-hidden="true" tabindex="-1"></a>        {</span>
+<span id="cb8-43"><a href="#cb8-43" aria-hidden="true" tabindex="-1"></a>          W.vec <span class="ot">&lt;-</span> <span class="fu">c</span>(W.vec, <span class="fu">rep</span>(W.at.K.vec[k.temp], randomization.points[k.temp <span class="sc">+</span> <span class="dv">1</span>] <span class="sc">-</span> randomization.points[k.temp]))</span>
+<span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb8-45"><a href="#cb8-45" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ===When k == K, append the last epoch after the last randomization</span></span>
+<span id="cb8-46"><a href="#cb8-46" aria-hidden="true" tabindex="-1"></a>        W.vec <span class="ot">&lt;-</span> <span class="fu">c</span>(W.vec, <span class="fu">rep</span>(W.at.K.vec[K], time.horizon <span class="sc">+</span> <span class="dv">1</span> <span class="sc">-</span> randomization.points[K]))</span>
+<span id="cb8-47"><a href="#cb8-47" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb8-48"><a href="#cb8-48" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span> (K <span class="sc">==</span> <span class="dv">1</span>) {</span>
+<span id="cb8-49"><a href="#cb8-49" aria-hidden="true" tabindex="-1"></a>        W.vec <span class="ot">&lt;-</span> <span class="fu">rep</span>(W.at.K.vec[K], time.horizon <span class="sc">+</span> <span class="dv">1</span> <span class="sc">-</span> randomization.points[K])</span>
+<span id="cb8-50"><a href="#cb8-50" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb8-51"><a href="#cb8-51" aria-hidden="true" tabindex="-1"></a>      treatment.balance <span class="ot">&lt;-</span> <span class="fu">abs</span>(<span class="fu">sum</span>(W.at.K.vec) <span class="sc">-</span> K <span class="sc">/</span> <span class="dv">2</span>)</span>
+<span id="cb8-52"><a href="#cb8-52" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb8-53"><a href="#cb8-53" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb8-54"><a href="#cb8-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-55"><a href="#cb8-55" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(W.vec)</span>
+<span id="cb8-56"><a href="#cb8-56" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-57"><a href="#cb8-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-58"><a href="#cb8-58" aria-hidden="true" tabindex="-1"></a>generate_estimator <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">randomization.points_ =</span> randomization.points,</span>
+<span id="cb8-59"><a href="#cb8-59" aria-hidden="true" tabindex="-1"></a>                               <span class="at">assignment.path_ =</span> assignment.path,</span>
+<span id="cb8-60"><a href="#cb8-60" aria-hidden="true" tabindex="-1"></a>                               <span class="at">potential.outcome.path_ =</span> potential.outcome.path,</span>
+<span id="cb8-61"><a href="#cb8-61" aria-hidden="true" tabindex="-1"></a>                               <span class="at">p.lag.length_ =</span> p.lag.length) {</span>
+<span id="cb8-62"><a href="#cb8-62" aria-hidden="true" tabindex="-1"></a>  inversed.propensity.score <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="dv">0</span>, p.lag.length_)</span>
+<span id="cb8-63"><a href="#cb8-63" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (t <span class="cf">in</span> (p.lag.length_ <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span>time.horizon)</span>
+<span id="cb8-64"><a href="#cb8-64" aria-hidden="true" tabindex="-1"></a>  {</span>
+<span id="cb8-65"><a href="#cb8-65" aria-hidden="true" tabindex="-1"></a>    i.p.s.temp <span class="ot">&lt;-</span> <span class="dv">2</span><span class="sc">^</span>(<span class="fu">sum</span>(randomization.points_ <span class="sc">%in%</span> ((t <span class="sc">-</span> p.lag.length_ <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span>t)) <span class="sc">+</span> <span class="dv">1</span>)</span>
+<span id="cb8-66"><a href="#cb8-66" aria-hidden="true" tabindex="-1"></a>    inversed.propensity.score <span class="ot">&lt;-</span> <span class="fu">c</span>(inversed.propensity.score, i.p.s.temp)</span>
+<span id="cb8-67"><a href="#cb8-67" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb8-68"><a href="#cb8-68" aria-hidden="true" tabindex="-1"></a>  <span class="co"># inversed.propensity.score</span></span>
+<span id="cb8-69"><a href="#cb8-69" aria-hidden="true" tabindex="-1"></a>  positive.or.negative <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="dv">0</span>, p.lag.length_)</span>
+<span id="cb8-70"><a href="#cb8-70" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (t <span class="cf">in</span> (p.lag.length_ <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span>time.horizon)</span>
+<span id="cb8-71"><a href="#cb8-71" aria-hidden="true" tabindex="-1"></a>  {</span>
+<span id="cb8-72"><a href="#cb8-72" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">sum</span>(assignment.path_[(t <span class="sc">-</span> p.lag.length_)<span class="sc">:</span>t] <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">==</span> (p.lag.length_ <span class="sc">+</span> <span class="dv">1</span>)) {</span>
+<span id="cb8-73"><a href="#cb8-73" aria-hidden="true" tabindex="-1"></a>      p.or.n.temp <span class="ot">&lt;-</span> <span class="dv">1</span></span>
+<span id="cb8-74"><a href="#cb8-74" aria-hidden="true" tabindex="-1"></a>    } <span class="cf">else</span> <span class="cf">if</span> (<span class="fu">sum</span>(assignment.path_[(t <span class="sc">-</span> p.lag.length_)<span class="sc">:</span>t] <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">==</span> <span class="dv">0</span>) {</span>
+<span id="cb8-75"><a href="#cb8-75" aria-hidden="true" tabindex="-1"></a>      p.or.n.temp <span class="ot">&lt;-</span> <span class="sc">-</span><span class="dv">1</span></span>
+<span id="cb8-76"><a href="#cb8-76" aria-hidden="true" tabindex="-1"></a>    } <span class="cf">else</span> {</span>
+<span id="cb8-77"><a href="#cb8-77" aria-hidden="true" tabindex="-1"></a>      p.or.n.temp <span class="ot">&lt;-</span> <span class="dv">0</span></span>
+<span id="cb8-78"><a href="#cb8-78" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb8-79"><a href="#cb8-79" aria-hidden="true" tabindex="-1"></a>    positive.or.negative <span class="ot">&lt;-</span> <span class="fu">c</span>(positive.or.negative, p.or.n.temp)</span>
+<span id="cb8-80"><a href="#cb8-80" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb8-81"><a href="#cb8-81" aria-hidden="true" tabindex="-1"></a>  <span class="co"># positive.or.negative</span></span>
+<span id="cb8-82"><a href="#cb8-82" aria-hidden="true" tabindex="-1"></a>  estimator.return <span class="ot">&lt;-</span> <span class="fu">sum</span>(potential.outcome.path_ <span class="sc">*</span> inversed.propensity.score <span class="sc">*</span> positive.or.negative) <span class="sc">/</span> (time.horizon <span class="sc">-</span> p.lag.length_)</span>
+<span id="cb8-83"><a href="#cb8-83" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(estimator.return)</span>
+<span id="cb8-84"><a href="#cb8-84" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-85"><a href="#cb8-85" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-86"><a href="#cb8-86" aria-hidden="true" tabindex="-1"></a>generate_variance_UB_OPTDesign <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">randomization.points_ =</span> randomization.points,</span>
+<span id="cb8-87"><a href="#cb8-87" aria-hidden="true" tabindex="-1"></a>                                           assignment.path_,</span>
+<span id="cb8-88"><a href="#cb8-88" aria-hidden="true" tabindex="-1"></a>                                           potential.outcome.path_,</span>
+<span id="cb8-89"><a href="#cb8-89" aria-hidden="true" tabindex="-1"></a>                                           <span class="at">p.lag.length_ =</span> p.lag.length,</span>
+<span id="cb8-90"><a href="#cb8-90" aria-hidden="true" tabindex="-1"></a>                                           <span class="at">which.upper.bound =</span> <span class="dv">2</span>) {</span>
+<span id="cb8-91"><a href="#cb8-91" aria-hidden="true" tabindex="-1"></a>  K.many.randomizations <span class="ot">&lt;-</span> <span class="fu">length</span>(randomization.points_)</span>
+<span id="cb8-92"><a href="#cb8-92" aria-hidden="true" tabindex="-1"></a>  <span class="co"># ==Note: 1. n in the paper corresponds to (K.many.randomizations+2)</span></span>
+<span id="cb8-93"><a href="#cb8-93" aria-hidden="true" tabindex="-1"></a>  <span class="co">#        2. the paper starts with k=0; the codes starts with K.many.randomizations=1</span></span>
+<span id="cb8-94"><a href="#cb8-94" aria-hidden="true" tabindex="-1"></a>  observed.chunks <span class="ot">&lt;-</span> <span class="fu">c</span>()</span>
+<span id="cb8-95"><a href="#cb8-95" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (this.randomization <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(K.many.randomizations <span class="sc">+</span> <span class="dv">1</span>))</span>
+<span id="cb8-96"><a href="#cb8-96" aria-hidden="true" tabindex="-1"></a>  {</span>
+<span id="cb8-97"><a href="#cb8-97" aria-hidden="true" tabindex="-1"></a>    temp.sum <span class="ot">&lt;-</span> <span class="fu">sum</span>(potential.outcome.path_[(this.randomization <span class="sc">*</span> p.lag.length_ <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span>((this.randomization <span class="sc">+</span> <span class="dv">1</span>) <span class="sc">*</span> p.lag.length_)])</span>
+<span id="cb8-98"><a href="#cb8-98" aria-hidden="true" tabindex="-1"></a>    observed.chunks <span class="ot">&lt;-</span> <span class="fu">c</span>(observed.chunks, temp.sum)</span>
+<span id="cb8-99"><a href="#cb8-99" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb8-100"><a href="#cb8-100" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (which.upper.bound <span class="sc">==</span> <span class="dv">1</span>) {</span>
+<span id="cb8-101"><a href="#cb8-101" aria-hidden="true" tabindex="-1"></a>    variance.estimator <span class="ot">&lt;-</span> <span class="dv">6</span> <span class="sc">*</span> (observed.chunks[<span class="dv">1</span>])<span class="sc">^</span><span class="dv">2</span> <span class="sc">+</span> <span class="dv">6</span> <span class="sc">*</span> (observed.chunks[K.many.randomizations <span class="sc">+</span> <span class="dv">1</span>])<span class="sc">^</span><span class="dv">2</span></span>
+<span id="cb8-102"><a href="#cb8-102" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (this.randomization <span class="cf">in</span> <span class="dv">2</span><span class="sc">:</span>(K.many.randomizations))</span>
+<span id="cb8-103"><a href="#cb8-103" aria-hidden="true" tabindex="-1"></a>    {</span>
+<span id="cb8-104"><a href="#cb8-104" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span> (assignment.path_[(this.randomization <span class="sc">-</span> <span class="dv">1</span>) <span class="sc">*</span> p.lag.length_ <span class="sc">+</span> <span class="dv">1</span>] <span class="sc">==</span> assignment.path_[this.randomization <span class="sc">*</span> p.lag.length_ <span class="sc">+</span> <span class="dv">1</span>]) {</span>
+<span id="cb8-105"><a href="#cb8-105" aria-hidden="true" tabindex="-1"></a>        variance.estimator <span class="ot">&lt;-</span> variance.estimator <span class="sc">+</span> <span class="dv">24</span> <span class="sc">*</span> (observed.chunks[this.randomization])<span class="sc">^</span><span class="dv">2</span></span>
+<span id="cb8-106"><a href="#cb8-106" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb8-107"><a href="#cb8-107" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb8-108"><a href="#cb8-108" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (this.randomization <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(K.many.randomizations))</span>
+<span id="cb8-109"><a href="#cb8-109" aria-hidden="true" tabindex="-1"></a>    {</span>
+<span id="cb8-110"><a href="#cb8-110" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span> (assignment.path_[(this.randomization <span class="sc">-</span> <span class="dv">1</span>) <span class="sc">*</span> p.lag.length_ <span class="sc">+</span> <span class="dv">1</span>] <span class="sc">==</span> assignment.path_[this.randomization <span class="sc">*</span> p.lag.length_ <span class="sc">+</span> <span class="dv">1</span>] <span class="sc">&amp;&amp;</span></span>
+<span id="cb8-111"><a href="#cb8-111" aria-hidden="true" tabindex="-1"></a>        assignment.path_[(this.randomization <span class="sc">+</span> <span class="dv">1</span>) <span class="sc">*</span> p.lag.length_ <span class="sc">+</span> <span class="dv">1</span>] <span class="sc">==</span> assignment.path_[this.randomization <span class="sc">*</span> p.lag.length_ <span class="sc">+</span> <span class="dv">1</span>]) {</span>
+<span id="cb8-112"><a href="#cb8-112" aria-hidden="true" tabindex="-1"></a>        variance.estimator <span class="ot">&lt;-</span> variance.estimator <span class="sc">+</span> <span class="dv">16</span> <span class="sc">*</span> observed.chunks[this.randomization] <span class="sc">*</span> observed.chunks[this.randomization <span class="sc">+</span> <span class="dv">1</span>]</span>
+<span id="cb8-113"><a href="#cb8-113" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb8-114"><a href="#cb8-114" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb8-115"><a href="#cb8-115" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb8-116"><a href="#cb8-116" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (which.upper.bound <span class="sc">==</span> <span class="dv">2</span>) {</span>
+<span id="cb8-117"><a href="#cb8-117" aria-hidden="true" tabindex="-1"></a>    variance.estimator <span class="ot">&lt;-</span> <span class="dv">8</span> <span class="sc">*</span> (observed.chunks[<span class="dv">1</span>])<span class="sc">^</span><span class="dv">2</span> <span class="sc">+</span> <span class="dv">8</span> <span class="sc">*</span> (observed.chunks[K.many.randomizations <span class="sc">+</span> <span class="dv">1</span>])<span class="sc">^</span><span class="dv">2</span></span>
+<span id="cb8-118"><a href="#cb8-118" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (this.randomization <span class="cf">in</span> <span class="dv">2</span><span class="sc">:</span>(K.many.randomizations))</span>
+<span id="cb8-119"><a href="#cb8-119" aria-hidden="true" tabindex="-1"></a>    {</span>
+<span id="cb8-120"><a href="#cb8-120" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span> (assignment.path_[(this.randomization <span class="sc">-</span> <span class="dv">1</span>) <span class="sc">*</span> p.lag.length_ <span class="sc">+</span> <span class="dv">1</span>] <span class="sc">==</span> assignment.path_[this.randomization <span class="sc">*</span> p.lag.length_ <span class="sc">+</span> <span class="dv">1</span>]) {</span>
+<span id="cb8-121"><a href="#cb8-121" aria-hidden="true" tabindex="-1"></a>        variance.estimator <span class="ot">&lt;-</span> variance.estimator <span class="sc">+</span> <span class="dv">32</span> <span class="sc">*</span> (observed.chunks[this.randomization])<span class="sc">^</span><span class="dv">2</span></span>
+<span id="cb8-122"><a href="#cb8-122" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb8-123"><a href="#cb8-123" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb8-124"><a href="#cb8-124" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb8-125"><a href="#cb8-125" aria-hidden="true" tabindex="-1"></a>  estimator.return <span class="ot">&lt;-</span> variance.estimator <span class="sc">/</span> ((time.horizon <span class="sc">-</span> p.lag.length_)<span class="sc">^</span><span class="dv">2</span>)</span>
+<span id="cb8-126"><a href="#cb8-126" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(estimator.return)</span>
+<span id="cb8-127"><a href="#cb8-127" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-128"><a href="#cb8-128" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-129"><a href="#cb8-129" aria-hidden="true" tabindex="-1"></a>my_fisher_test <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">randomization.points_ =</span> randomization.points,</span>
+<span id="cb8-130"><a href="#cb8-130" aria-hidden="true" tabindex="-1"></a>                           <span class="at">realized.outcome.path_ =</span> realized.outcome.path,</span>
+<span id="cb8-131"><a href="#cb8-131" aria-hidden="true" tabindex="-1"></a>                           <span class="at">realized.HT.estimator_ =</span> realized.HT.estimator,</span>
+<span id="cb8-132"><a href="#cb8-132" aria-hidden="true" tabindex="-1"></a>                           <span class="at">SAMPLE.TIMES.fisher.test_ =</span> SAMPLE.TIMES.fisher.test) {</span>
+<span id="cb8-133"><a href="#cb8-133" aria-hidden="true" tabindex="-1"></a>  indicator.more.extreme <span class="ot">&lt;-</span> <span class="fu">c</span>()</span>
+<span id="cb8-134"><a href="#cb8-134" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (TIMES.temp <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>SAMPLE.TIMES.fisher.test_)</span>
+<span id="cb8-135"><a href="#cb8-135" aria-hidden="true" tabindex="-1"></a>  {</span>
+<span id="cb8-136"><a href="#cb8-136" aria-hidden="true" tabindex="-1"></a>    simulated.assignment.path <span class="ot">&lt;-</span> <span class="fu">generate_assignments</span>(time.horizon, randomization.points_)</span>
+<span id="cb8-137"><a href="#cb8-137" aria-hidden="true" tabindex="-1"></a>    simulated.HT.estimator <span class="ot">&lt;-</span> <span class="fu">generate_estimator</span>(randomization.points_, simulated.assignment.path, realized.outcome.path_)</span>
+<span id="cb8-138"><a href="#cb8-138" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-139"><a href="#cb8-139" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">abs</span>(simulated.HT.estimator) <span class="sc">&gt;</span> <span class="fu">abs</span>(realized.HT.estimator_)) {</span>
+<span id="cb8-140"><a href="#cb8-140" aria-hidden="true" tabindex="-1"></a>      indicator.more.extreme <span class="ot">&lt;-</span> <span class="fu">c</span>(indicator.more.extreme, <span class="dv">1</span>)</span>
+<span id="cb8-141"><a href="#cb8-141" aria-hidden="true" tabindex="-1"></a>    } <span class="cf">else</span> {</span>
+<span id="cb8-142"><a href="#cb8-142" aria-hidden="true" tabindex="-1"></a>      indicator.more.extreme <span class="ot">&lt;-</span> <span class="fu">c</span>(indicator.more.extreme, <span class="dv">0</span>)</span>
+<span id="cb8-143"><a href="#cb8-143" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb8-144"><a href="#cb8-144" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb8-145"><a href="#cb8-145" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(<span class="fu">sum</span>(indicator.more.extreme) <span class="sc">/</span> SAMPLE.TIMES.fisher.test_)</span>
+<span id="cb8-146"><a href="#cb8-146" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-147"><a href="#cb8-147" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-148"><a href="#cb8-148" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-149"><a href="#cb8-149" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">111111</span>)</span>
+<span id="cb8-150"><a href="#cb8-150" aria-hidden="true" tabindex="-1"></a>time.horizon <span class="ot">&lt;-</span> <span class="dv">120</span></span>
+<span id="cb8-151"><a href="#cb8-151" aria-hidden="true" tabindex="-1"></a>no.m.carryover <span class="ot">&lt;-</span> <span class="dv">2</span></span>
+<span id="cb8-152"><a href="#cb8-152" aria-hidden="true" tabindex="-1"></a>p.lag.length <span class="ot">&lt;-</span> <span class="dv">2</span></span>
+<span id="cb8-153"><a href="#cb8-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-154"><a href="#cb8-154" aria-hidden="true" tabindex="-1"></a>SPEC.temp <span class="ot">&lt;-</span> <span class="dv">1</span></span>
+<span id="cb8-155"><a href="#cb8-155" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-156"><a href="#cb8-156" aria-hidden="true" tabindex="-1"></a>mu.fixed.effect <span class="ot">&lt;-</span> <span class="dv">0</span></span>
+<span id="cb8-157"><a href="#cb8-157" aria-hidden="true" tabindex="-1"></a>alpha.fixed.effects <span class="ot">&lt;-</span> <span class="fu">log</span>(<span class="dv">1</span><span class="sc">:</span>time.horizon) <span class="co"># runif(time.horizon, min = 0, max = 1) #rnorm(time.horizon, mean = 0, sd = 1)</span></span>
+<span id="cb8-158"><a href="#cb8-158" aria-hidden="true" tabindex="-1"></a>epsilon.noises <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(time.horizon, <span class="at">mean =</span> <span class="dv">0</span>, <span class="at">sd =</span> <span class="dv">1</span>)</span>
+<span id="cb8-159"><a href="#cb8-159" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-160"><a href="#cb8-160" aria-hidden="true" tabindex="-1"></a>SPEC.temp <span class="ot">&lt;-</span> SPEC.temp <span class="sc">-</span> <span class="dv">1</span></span>
+<span id="cb8-161"><a href="#cb8-161" aria-hidden="true" tabindex="-1"></a>delta.coef<span class="fl">.1</span> <span class="ot">&lt;-</span> (SPEC.temp <span class="sc">&gt;=</span> <span class="dv">4</span>) <span class="sc">*</span> <span class="dv">2</span> <span class="sc">+</span> (SPEC.temp <span class="sc">&lt;</span> <span class="dv">4</span>) <span class="sc">*</span> <span class="dv">1</span></span>
+<span id="cb8-162"><a href="#cb8-162" aria-hidden="true" tabindex="-1"></a>delta.coef<span class="fl">.2</span> <span class="ot">&lt;-</span> ((SPEC.temp <span class="sc">%%</span> <span class="dv">4</span>) <span class="sc">&gt;=</span> <span class="dv">2</span>) <span class="sc">*</span> <span class="dv">2</span> <span class="sc">+</span> ((SPEC.temp <span class="sc">%%</span> <span class="dv">4</span>) <span class="sc">&lt;</span> <span class="dv">2</span>) <span class="sc">*</span> <span class="dv">1</span></span>
+<span id="cb8-163"><a href="#cb8-163" aria-hidden="true" tabindex="-1"></a>delta.coef<span class="fl">.3</span> <span class="ot">&lt;-</span> ((SPEC.temp <span class="sc">%%</span> <span class="dv">2</span>) <span class="sc">&gt;=</span> <span class="dv">1</span>) <span class="sc">*</span> <span class="dv">2</span> <span class="sc">+</span> ((SPEC.temp <span class="sc">%%</span> <span class="dv">2</span>) <span class="sc">&lt;</span> <span class="dv">1</span>) <span class="sc">*</span> <span class="dv">1</span></span>
+<span id="cb8-164"><a href="#cb8-164" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-165"><a href="#cb8-165" aria-hidden="true" tabindex="-1"></a><span class="co"># ===Optimal design===#</span></span>
+<span id="cb8-166"><a href="#cb8-166" aria-hidden="true" tabindex="-1"></a>randomization.points <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="fu">seq</span>(<span class="dv">2</span> <span class="sc">*</span> p.lag.length <span class="sc">+</span> <span class="dv">1</span>, time.horizon <span class="sc">-</span> <span class="dv">2</span> <span class="sc">*</span> p.lag.length <span class="sc">+</span> <span class="dv">1</span>, <span class="at">by =</span> p.lag.length))</span>
+<span id="cb8-167"><a href="#cb8-167" aria-hidden="true" tabindex="-1"></a>randomization.points_ <span class="ot">&lt;-</span> randomization.points</span>
+<span id="cb8-168"><a href="#cb8-168" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-169"><a href="#cb8-169" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">111111</span>)</span>
+<span id="cb8-170"><a href="#cb8-170" aria-hidden="true" tabindex="-1"></a>assignment.path <span class="ot">&lt;-</span> <span class="fu">generate_assignments</span>(time.horizon, randomization.points_)</span>
+<span id="cb8-171"><a href="#cb8-171" aria-hidden="true" tabindex="-1"></a>assignment.path_ <span class="ot">&lt;-</span> assignment.path</span>
+<span id="cb8-172"><a href="#cb8-172" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">111111</span>)</span>
+<span id="cb8-173"><a href="#cb8-173" aria-hidden="true" tabindex="-1"></a>potential.outcome.path <span class="ot">&lt;-</span> <span class="fu">generate_outcomes</span>(<span class="at">assignment.path_ =</span> assignment.path)</span>
+<span id="cb8-174"><a href="#cb8-174" aria-hidden="true" tabindex="-1"></a>potential.outcome.path_ <span class="ot">&lt;-</span> potential.outcome.path</span>
+<span id="cb8-175"><a href="#cb8-175" aria-hidden="true" tabindex="-1"></a>p.lag.length_ <span class="ot">&lt;-</span> p.lag.length</span>
+<span id="cb8-176"><a href="#cb8-176" aria-hidden="true" tabindex="-1"></a>HT.estimator <span class="ot">&lt;-</span> <span class="fu">generate_estimator</span>(randomization.points_, assignment.path, potential.outcome.path, p.lag.length)</span>
+<span id="cb8-177"><a href="#cb8-177" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-178"><a href="#cb8-178" aria-hidden="true" tabindex="-1"></a><span class="fu">paste0</span>(randomization.points <span class="sc">-</span> <span class="dv">1</span>, <span class="at">collapse =</span> <span class="st">", "</span>)</span>
+<span id="cb8-179"><a href="#cb8-179" aria-hidden="true" tabindex="-1"></a><span class="fu">paste0</span>(assignment.path, <span class="at">collapse =</span> <span class="st">", "</span>)</span>
+<span id="cb8-180"><a href="#cb8-180" aria-hidden="true" tabindex="-1"></a><span class="fu">paste0</span>(potential.outcome.path, <span class="at">collapse =</span> <span class="st">", "</span>)</span>
+<span id="cb8-181"><a href="#cb8-181" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-182"><a href="#cb8-182" aria-hidden="true" tabindex="-1"></a><span class="fu">generate_variance_UB_OPTDesign</span>(randomization.points, assignment.path, potential.outcome.path, p.lag.length, <span class="dv">1</span>)</span>
+<span id="cb8-183"><a href="#cb8-183" aria-hidden="true" tabindex="-1"></a><span class="fu">generate_variance_UB_OPTDesign</span>(randomization.points, assignment.path, potential.outcome.path, p.lag.length, <span class="dv">2</span>)</span>
+<span id="cb8-184"><a href="#cb8-184" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-185"><a href="#cb8-185" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">111111</span>)</span>
+<span id="cb8-186"><a href="#cb8-186" aria-hidden="true" tabindex="-1"></a>realized.outcome.path <span class="ot">&lt;-</span> potential.outcome.path</span>
+<span id="cb8-187"><a href="#cb8-187" aria-hidden="true" tabindex="-1"></a>realized.HT.estimator <span class="ot">&lt;-</span> HT.estimator</span>
+<span id="cb8-188"><a href="#cb8-188" aria-hidden="true" tabindex="-1"></a>p_value <span class="ot">&lt;-</span> <span class="fu">my_fisher_test</span>(randomization.points, realized.outcome.path, realized.HT.estimator, <span class="dv">10000</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="测试" class="level2">
+<h2 class="anchored" data-anchor-id="测试">测试</h2>
+<div class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> rpy2</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> rpy2 <span class="im">import</span> robjects</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> uniform(low<span class="op">=</span><span class="fl">0.0</span>, high<span class="op">=</span><span class="fl">1.0</span>):</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> rpy2.robjects.r(<span class="ss">f'runif(1, </span><span class="sc">{</span>low<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>high<span class="sc">}</span><span class="ss">)'</span>)[<span class="dv">0</span>]</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>random.uniform <span class="op">=</span> uniform</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> gauss(mu<span class="op">=</span><span class="fl">0.0</span>, sigma<span class="op">=</span><span class="fl">1.0</span>):</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> rpy2.robjects.r(<span class="ss">f'rnorm(1, </span><span class="sc">{</span>mu<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>sigma<span class="sc">}</span><span class="ss">)'</span>)[<span class="dv">0</span>]</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>random.gauss <span class="op">=</span> gauss</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>time_horizon <span class="op">=</span> <span class="dv">120</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>m <span class="op">=</span> <span class="dv">2</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>p <span class="op">=</span> <span class="fl">0.5</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>randomization_points <span class="op">=</span> generate_opt_design(time_horizon, m)</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>randomization_points <span class="op">==</span> [<span class="dv">0</span>, <span class="dv">4</span>, <span class="dv">6</span>, <span class="dv">8</span>, <span class="dv">10</span>, <span class="dv">12</span>, <span class="dv">14</span>, <span class="dv">16</span>, <span class="dv">18</span>, <span class="dv">20</span>, <span class="dv">22</span>, <span class="dv">24</span>, <span class="dv">26</span>, <span class="dv">28</span>, <span class="dv">30</span>, <span class="dv">32</span>, <span class="dv">34</span>, <span class="dv">36</span>, <span class="dv">38</span>, <span class="dv">40</span>, <span class="dv">42</span>, <span class="dv">44</span>, <span class="dv">46</span>, <span class="dv">48</span>, <span class="dv">50</span>, <span class="dv">52</span>, <span class="dv">54</span>, <span class="dv">56</span>, <span class="dv">58</span>, <span class="dv">60</span>, <span class="dv">62</span>, <span class="dv">64</span>, <span class="dv">66</span>, <span class="dv">68</span>, <span class="dv">70</span>, <span class="dv">72</span>, <span class="dv">74</span>, <span class="dv">76</span>, <span class="dv">78</span>, <span class="dv">80</span>, <span class="dv">82</span>, <span class="dv">84</span>, <span class="dv">86</span>, <span class="dv">88</span>, <span class="dv">90</span>, <span class="dv">92</span>, <span class="dv">94</span>, <span class="dv">96</span>, <span class="dv">98</span>, <span class="dv">100</span>, <span class="dv">102</span>, <span class="dv">104</span>, <span class="dv">106</span>, <span class="dv">108</span>, <span class="dv">110</span>, <span class="dv">112</span>, <span class="dv">114</span>, <span class="dv">116</span>]</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>rpy2.robjects.r(<span class="st">'set.seed(111111)'</span>)</span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>assignment_path <span class="op">=</span> generate_assignment_path(randomization_points, time_horizon, m)</span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>assignment_path <span class="op">==</span> [<span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>]</span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>rpy2.robjects.r(<span class="st">'set.seed(111111)'</span>)</span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>tau <span class="op">=</span> [<span class="fl">1.0</span>, <span class="fl">1.0</span>, <span class="fl">1.0</span>]</span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>new <span class="op">=</span> generate_outcome(assignment_path, tau)</span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>old <span class="op">=</span> [<span class="fl">0.434833396762166</span>, <span class="fl">4.16060424082402</span>, <span class="fl">2.91790649574515</span>, <span class="fl">1.39691331193944</span>, <span class="fl">1.89948806343165</span>, <span class="fl">1.03413730352493</span>, <span class="fl">2.15911140118438</span>, <span class="fl">0.726763259743356</span>, <span class="fl">2.92463672663345</span>, <span class="fl">4.58618087124496</span>, <span class="fl">4.18384842961183</span>, <span class="fl">3.1231545672721</span>, <span class="fl">3.21073297148204</span>, <span class="fl">3.47490426238806</span>, <span class="fl">3.56474787955819</span>, <span class="fl">2.54866565554569</span>, <span class="fl">4.91954787364933</span>, <span class="fl">4.88928321075681</span>, <span class="fl">4.9743504050517</span>, <span class="fl">2.70367936403911</span>, <span class="fl">2.95728735703276</span>, <span class="fl">2.98231567022872</span>, <span class="fl">3.15047612777084</span>, <span class="fl">4.75759922483731</span>, <span class="fl">4.21003885524797</span>, <span class="fl">4.18157462124439</span>, <span class="fl">3.98018891962639</span>, <span class="fl">1.16235745274864</span>, <span class="fl">3.50045561681502</span>, <span class="fl">4.71330628773</span>, <span class="fl">7.41427588498954</span>, <span class="fl">7.58288977468063</span>, <span class="fl">3.66055128679812</span>, <span class="fl">6.66440465565843</span>, <span class="fl">7.76594302836741</span>, <span class="fl">6.77364773746862</span>, <span class="fl">6.81486072393467</span>, <span class="fl">7.17627340036311</span>, <span class="fl">6.94461498042583</span>, <span class="fl">4.95567982004171</span>, <span class="fl">4.134366340668</span>, <span class="fl">4.77460987865831</span>, <span class="fl">3.66956005339461</span>, <span class="fl">4.66945960334466</span>, <span class="fl">6.96777432423419</span>, <span class="fl">8.82477105962375</span>, <span class="fl">7.93560696678956</span>, <span class="fl">7.09219170394525</span>, <span class="fl">7.41808254583203</span>, <span class="fl">6.72985155755407</span>, <span class="fl">6.17527976040663</span>, <span class="fl">5.50046812367082</span>, <span class="fl">5.36712241699065</span>, <span class="fl">6.55157620396049</span>, <span class="fl">6.6043594442257</span>, <span class="fl">4.3693445377948</span>, <span class="fl">4.19116981629592</span>, <span class="fl">7.11932150789102</span>, <span class="fl">7.20109572388284</span>, <span class="fl">4.52958187431917</span>, <span class="fl">5.65838275247701</span>, <span class="fl">5.59302894651198</span>, <span class="fl">7.64497906403363</span>, <span class="fl">7.05994580978854</span>, <span class="fl">6.42953658082273</span>, <span class="fl">4.93605896614588</span>, <span class="fl">4.57012924056999</span>, <span class="fl">5.13460375030383</span>, <span class="fl">3.98956716798835</span>, <span class="fl">4.5981473775092</span>, <span class="fl">5.24111915320301</span>, <span class="fl">6.76715647313569</span>, <span class="fl">6.48136089503326</span>, <span class="fl">3.3390609421107</span>, <span class="fl">4.38550261887666</span>, <span class="fl">4.00281801241419</span>, <span class="fl">5.63593883392727</span>, <span class="fl">4.51114882325828</span>, <span class="fl">6.69375332242523</span>, <span class="fl">6.67908667999775</span>, <span class="fl">7.76266602632671</span>, <span class="fl">7.45073549720124</span>, <span class="fl">8.07512244608518</span>, <span class="fl">8.18160320073618</span>, <span class="fl">7.31424756022565</span>, <span class="fl">6.33777035346318</span>, <span class="fl">8.29799454274423</span>, <span class="fl">7.86514809758498</span>, <span class="fl">6.40034682322799</span>, <span class="fl">5.61428130970244</span>, <span class="fl">6.26500016482481</span>, <span class="fl">5.98545855080484</span>, <span class="fl">9.56853136084471</span>, <span class="fl">8.27671475492981</span>, <span class="fl">8.12184976500245</span>, <span class="fl">7.68740785084192</span>, <span class="fl">5.47432743435136</span>, <span class="fl">6.66885979993122</span>, <span class="fl">5.27395984151641</span>, <span class="fl">5.97031188315572</span>, <span class="fl">5.27049863949522</span>, <span class="fl">5.25857394090524</span>, <span class="fl">5.51198076300874</span>, <span class="fl">7.90167715761987</span>, <span class="fl">6.1132133505048</span>, <span class="fl">4.17501094237396</span>, <span class="fl">4.36195238641099</span>, <span class="fl">5.938491498465</span>, <span class="fl">3.64356687366051</span>, <span class="fl">3.31405838215769</span>, <span class="fl">6.66062556034787</span>, <span class="fl">4.40917856947105</span>, <span class="fl">7.63688284192356</span>, <span class="fl">9.25694462626588</span>, <span class="fl">8.20932808339688</span>, <span class="fl">5.74591373194745</span>, <span class="fl">6.52468337004635</span>, <span class="fl">7.62154595985734</span>, <span class="fl">2.27443244264151</span>, <span class="fl">4.38031586688583</span>]</span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a><span class="bu">sum</span>(<span class="dv">1</span> <span class="cf">if</span> <span class="bu">abs</span>(i <span class="op">-</span> j) <span class="op">&lt;</span> <span class="fl">1.0e-10</span> <span class="cf">else</span> <span class="dv">0</span> <span class="cf">for</span> (i, j) <span class="kw">in</span> <span class="bu">zip</span>(new, old)) <span class="op">==</span> time_horizon</span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>potential_outcome_path <span class="op">=</span> new</span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a>new_est <span class="op">=</span> estimate_tau(</span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a>  randomization_points, </span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a>  assignment_path, </span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a>  potential_outcome_path, </span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a>  m</span>
+<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a><span class="bu">abs</span>(new_est[<span class="dv">0</span>] <span class="op">-</span> <span class="fl">6.295755</span>) <span class="op">&lt;</span> <span class="fl">1.0e-6</span></span>
+<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a>var1 <span class="op">=</span> generate_ub_variance_opt_design(randomization_points, assignment_path, potential_outcome_path, m, <span class="dv">1</span>)</span>
+<span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a>var2 <span class="op">=</span> generate_ub_variance_opt_design(randomization_points, assignment_path, potential_outcome_path, m, <span class="dv">2</span>)</span>
+<span id="cb9-40"><a href="#cb9-40" aria-hidden="true" tabindex="-1"></a><span class="bu">abs</span>(var1 <span class="op">-</span> <span class="fl">10.798</span>) <span class="op">&lt;</span> <span class="fl">1.0e-3</span></span>
+<span id="cb9-41"><a href="#cb9-41" aria-hidden="true" tabindex="-1"></a><span class="bu">abs</span>(var2 <span class="op">-</span> <span class="fl">10.307</span>) <span class="op">&lt;</span> <span class="fl">1.0e-3</span></span>
+<span id="cb9-42"><a href="#cb9-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-43"><a href="#cb9-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-44"><a href="#cb9-44" aria-hidden="true" tabindex="-1"></a>rpy2.robjects.r(<span class="st">'set.seed(111111)'</span>)</span>
+<span id="cb9-45"><a href="#cb9-45" aria-hidden="true" tabindex="-1"></a>p_value <span class="op">=</span> fisher_test_switchback(</span>
+<span id="cb9-46"><a href="#cb9-46" aria-hidden="true" tabindex="-1"></a>  randomization_points,</span>
+<span id="cb9-47"><a href="#cb9-47" aria-hidden="true" tabindex="-1"></a>  assignment_path, </span>
+<span id="cb9-48"><a href="#cb9-48" aria-hidden="true" tabindex="-1"></a>  potential_outcome_path, </span>
+<span id="cb9-49"><a href="#cb9-49" aria-hidden="true" tabindex="-1"></a>  m, <span class="dv">10000</span></span>
+<span id="cb9-50"><a href="#cb9-50" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-51"><a href="#cb9-51" aria-hidden="true" tabindex="-1"></a><span class="bu">abs</span>(p_value <span class="op">-</span> <span class="fl">0.032</span>) <span class="op">&lt;</span> <span class="fl">1.0e-3</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
