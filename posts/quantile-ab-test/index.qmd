@@ -98,6 +98,14 @@ $$ QTE \sim \mathcal{N}(\hat{Q}_t(\tau) - \hat{Q}_c(\tau), \sqrt{Var(\hat{Q_t(\t
 
 这个结果对实验分组变量D（表示用户是实验组还是对照组）做分位数回归的结果是一致的。
 
+
+## 非聚类情况的分位数检验
+
+我们先考虑非聚类样本的情况，或者说随机单元等于分析单元的情况。假设有n个独立样本$X = {x_0, x_1, x_2, ..., x_{n - 1}}$, 记为$q_X(\tau)$为X的第$\tau$个分位数，相应的$\hat{q}_X(\tau)$为样本tau分位数
+
+$$ q(\tau) \sim \mathcal{N}(\hat{q}(\tau), \frac{\tau * (1 - \tau)}{n * f(\hat{q}(\tau))^2})) $$
+
+
 ```{python}
 from typing import List, Callable
 import numpy as np
@@ -106,12 +114,6 @@ from scipy.stats import norm
 import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
-
-## 非聚类情况的分位数检验
-
-我们先考虑非聚类样本的情况，或者说随机单元等于分析单元的情况。假设有n个独立样本$X = {x_0, x_1, x_2, ..., x_{n - 1}}$, 记为$q_X(\tau)$为X的第$\tau$个分位数，相应的$\hat{q}_X(\tau)$为样本tau分位数
-
-$$ q(\tau) \sim \mathcal{N}(\hat{q}(\tau), \frac{\tau * (1 - \tau)}{n * f(\hat{q}(\tau))^2})) $$
 
 
 def quant_test(x: List[float], y: List[float], tau: float, conf_level: float = 0.95, alternative: str = 'two-sided'):
@@ -212,85 +214,85 @@ $$
 
 
 ```{r}
-n0 <- 1000
-mu0 <- 0.0
-sd0 <- 1.0
-n1 <- 1100
-mu1 <- 0.2
-sd1 <- 0.8
+# n0 <- 1000
+# mu0 <- 0.0
+# sd0 <- 1.0
+# n1 <- 1100
+# mu1 <- 0.2
+# sd1 <- 0.8
 
-y0 <- rnorm(n0, mu0, sd0)
-y1 <- rnorm(n1, mu1, sd1)
-# x <- rep(0:1, c(n0, n1))
-x <- matrix(rep(c(1, 0, 1), c(n0 + n1, n0, n1)), ncol = 2)
-# x <- matrix(rep(c(0, 1), c(n0, n1)), ncol = 1)
-y <- matrix(c(y0, y1), ncol = 1)
+# y0 <- rnorm(n0, mu0, sd0)
+# y1 <- rnorm(n1, mu1, sd1)
+# # x <- rep(0:1, c(n0, n1))
+# x <- matrix(rep(c(1, 0, 1), c(n0 + n1, n0, n1)), ncol = 2)
+# # x <- matrix(rep(c(0, 1), c(n0, n1)), ncol = 1)
+# y <- matrix(c(y0, y1), ncol = 1)
 
 
-wquantile <- function(x, y, tau = 0.5) {
-  o <- order(y / x)
-  b <- (y / x)[o]
-  w <- abs(x[o])
-  k <- sum(cumsum(w) < ((tau - 0.5) * sum(x) + 0.5 * sum(w)))
-  #   k <- sum(cumsum(w) < ((tau - 1.) * sum(x) + tau * sum(w)))
-  list(coef = b[k + 1], k = o[k + 1])
-}
+# wquantile <- function(x, y, tau = 0.5) {
+#   o <- order(y / x)
+#   b <- (y / x)[o]
+#   w <- abs(x[o])
+#   k <- sum(cumsum(w) < ((tau - 0.5) * sum(x) + 0.5 * sum(w)))
+#   #   k <- sum(cumsum(w) < ((tau - 1.) * sum(x) + tau * sum(w)))
+#   list(coef = b[k + 1], k = o[k + 1])
+# }
 
-rqx <- function(x, y, tau = 0.5, max.it = 50) { # Barrodale and Roberts -- lite
-  p <- ncol(x)
-  n <- nrow(x)
-  h <- sample(1:n, size = p) # Phase I -- find a random (!) initial basis
-  it <- 0
-  repeat {
-    it <- it + 1
-    Xhinv <- solve(x[h, ])
-    bh <- Xhinv %*% y[h]
-    rh <- y - x %*% bh
-    # find direction of steepest descent along one of the edges
-    g <- -t(Xhinv) %*% t(x[-h, ]) %*% c(tau - (rh[-h] < 0))
-    g <- c(g + (1 - tau), -g + tau)
-    ming <- min(g)
-    if (ming >= 0 || it > max.it) break
-    h.out <- seq(along = g)[g == ming]
-    sigma <- ifelse(h.out <= p, 1, -1)
-    if (sigma < 0) h.out <- h.out - p
-    d <- sigma * Xhinv[, h.out]
-    # find step length by one-dimensional wquantile minimization
-    xh <- x %*% d
-    step <- wquantile(xh, rh, tau)
-    h.in <- step$k
-    h <- c(h[-h.out], h.in)
-  }
-  if (it > max.it) warning("non-optimal solution: max.it exceeded")
-  return(bh)
-}
+# rqx <- function(x, y, tau = 0.5, max.it = 50) { # Barrodale and Roberts -- lite
+#   p <- ncol(x)
+#   n <- nrow(x)
+#   h <- sample(1:n, size = p) # Phase I -- find a random (!) initial basis
+#   it <- 0
+#   repeat {
+#     it <- it + 1
+#     Xhinv <- solve(x[h, ])
+#     bh <- Xhinv %*% y[h]
+#     rh <- y - x %*% bh
+#     # find direction of steepest descent along one of the edges
+#     g <- -t(Xhinv) %*% t(x[-h, ]) %*% c(tau - (rh[-h] < 0))
+#     g <- c(g + (1 - tau), -g + tau)
+#     ming <- min(g)
+#     if (ming >= 0 || it > max.it) break
+#     h.out <- seq(along = g)[g == ming]
+#     sigma <- ifelse(h.out <= p, 1, -1)
+#     if (sigma < 0) h.out <- h.out - p
+#     d <- sigma * Xhinv[, h.out]
+#     # find step length by one-dimensional wquantile minimization
+#     xh <- x %*% d
+#     step <- wquantile(xh, rh, tau)
+#     h.in <- step$k
+#     h <- c(h[-h.out], h.in)
+#   }
+#   if (it > max.it) warning("non-optimal solution: max.it exceeded")
+#   return(bh)
+# }
 
-meketon <- function(x, y, eps = 1e-04, beta = 0.97) {
-  f <- lm.fit(x, y)
-  n <- length(y)
-  w <- rep(0, n)
-  d <- rep(1, n)
-  its <- 0
-  while (sum(abs(f$resid)) - crossprod(y, w) > eps) {
-    its <- its + 1
-    s <- f$resid * d
-    alpha <- max(pmax(s / (1 - w), -s / (1 + w)))
-    w <- w + (beta / alpha) * s
-    d <- pmin(1 - w, 1 + w)^2
-    f <- lm.wfit(x, y, d)
-  }
-  list(coef = f$coef, iterations = its)
-}
+# meketon <- function(x, y, eps = 1e-04, beta = 0.97) {
+#   f <- lm.fit(x, y)
+#   n <- length(y)
+#   w <- rep(0, n)
+#   d <- rep(1, n)
+#   its <- 0
+#   while (sum(abs(f$resid)) - crossprod(y, w) > eps) {
+#     its <- its + 1
+#     s <- f$resid * d
+#     alpha <- max(pmax(s / (1 - w), -s / (1 + w)))
+#     w <- w + (beta / alpha) * s
+#     d <- pmin(1 - w, 1 + w)^2
+#     f <- lm.wfit(x, y, d)
+#   }
+#   list(coef = f$coef, iterations = its)
+# }
 
-tau <- 0.3
-# wquantile(t, xy, tau)$coef
-# quantile(y, tau) - quantile(x, tau)
+# tau <- 0.3
+# # wquantile(t, xy, tau)$coef
+# # quantile(y, tau) - quantile(x, tau)
 
-# sprintf("tau: %.4f, est: %.4f, act: %.4f", tau, wquantile(t, xy, tau)$coef, quantile(y, tau) - quantile(x, tau))
-meketon(x, y)$coef
-c(quantile(y0, tau), quantile(y1, tau) - quantile(y0, tau))
+# # sprintf("tau: %.4f, est: %.4f, act: %.4f", tau, wquantile(t, xy, tau)$coef, quantile(y, tau) - quantile(x, tau))
+# meketon(x, y)$coef
+# c(quantile(y0, tau), quantile(y1, tau) - quantile(y0, tau))
 
-sprintf("tau: %.4f, est: %.4f, act: %.4f", tau, rqx(x, y, tau), quantile(y1, tau) - quantile(y0, tau))
+# sprintf("tau: %.4f, est: %.4f, act: %.4f", tau, rqx(x, y, tau), quantile(y1, tau) - quantile(y0, tau))
 
 ```
 

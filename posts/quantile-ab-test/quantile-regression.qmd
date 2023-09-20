@@ -1,0 +1,25 @@
+---
+title: "分位数回归的原理、代码实现和聚类标准误"
+date: "2023-09-18"
+categories: [A/B test, quantile regression, clustered standard errors]
+bibliography: references.bib
+image: spotify.png
+---
+
+分位数回归(quantile regression)可以回答实验操作/处理对指标分布的影响，一个非常经典的例子是，教育培训对收入的影响，在这里，我们不仅关心平均收入，还关心收入的平等，比如收入的中位数等。下面我们简要概述分位数回归的原理，以及相关代码实现。
+
+分位数回归的核心问题是估计条件分位数$Q_{\tau}(Y_i|X_i) = F_y^-1(\tau|X_i)$：对连续变量Y，在给定一组协变量X下，预测其第$tau$分位数。它也是以下问题的解:
+
+$$ Q_{\tau}(Y_i|X_i) = \mathop{\arg\min}\limits_{q(X)} E[\rho_\tau(Y - q(X_i))] $$
+
+其中$\rho_\tau(u) = (\tau - \mathbb{1}(u <= 0)) * u, u = Y - q(X_i)$。这个公式就是分位数回归的损失函数，我们可以在xgboost、lightgbm、pytorch中自定义损失函数，实现非线性/深度分位数回归模型。这里我们先考虑线性的情况:
+
+$$ \beta_{\tau} = \mathop{\arg\min}\limits_{q(X)} E[\rho_\tau(Y - X\beta)] $$
+
+基于渐进理论
+
+
+
+
+
+
