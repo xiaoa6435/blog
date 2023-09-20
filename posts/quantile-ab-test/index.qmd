@@ -12,7 +12,100 @@ image: spotify.png
 
 - 线上零工经济\双边平台的收入平等问题，这和计量经济学中分位数检验/回归的核心问题类似。比如，对滴滴/uber的派单/抽成策略实验的讨论中，我们不仅需要关注对司机平均收入的影响，还需要注意策略是否加剧了司机收入的不平等，这里就需要关注策略对司机收入的分位数的影响
 
-本文主要基于linkedin @liu2019large 的[Large-Scale Online Experimentation with Quantile Metrics](https://arxiv.org/pdf/1903.08762.pdf)和Spotify @schultzberg2022resampling 的[Resampling-free bootstrap inference for quantiles](https://arxiv.org/pdf/2202.10992.pdf)，顺便也会提到和计量经济学的分位数回归的对比，来讨论A/B中分位数指标的处理。
+本文主要基于linkedin @liu2019large 的[Large-Scale Online Experimentation with Quantile Metrics](https://arxiv.org/pdf/1903.08762.pdf)和Spotify @schultzberg2022resampling 的[Resampling-free bootstrap inference for quantiles](https://arxiv.org/pdf/2202.10992.pdf)，同时也会提到和计量经济学的分位数回归的对比，来讨论A/B中分位数指标的处理。
+
+## 定义和符号 
+
+假设$X$是连续的随机变量，$x_0, x_1, x_2, ..., x_{n - 1}$是$X$的容量为N的随机独立样本(i.i.d)，$f(x)$是概率密度函数，$F(x)$累计概率分布。样本的第tau(0 <= tau <= 1)分位数记为$\hat{Q}(\tau)$, 相应的总体分位数记为 $Q(\tau)$。
+
+$$ \hat{Q}(\tau) \sim \mathcal{N}(Q(\tau), \frac{\tau * (1 - \tau)}{N * f(Q(\tau) ^ 2)}) $$
+
+这里有两个需要从样本中估计的量$Q(\tau)$和相应的$f(Q(\tau)$。$Q(\tau)$比较容易（尽管有9种估计方式，见[wiki](https://en.wikipedia.org/wiki/Quantile)，或者R的quantile的文档），$f(Q(\tau)$涉及到核密度估计, 下面稍微展开一下。
+
+$$ {\widehat {f}}_{h}(x)={\frac {1}{n}}\sum _{i=1}^{n}K_{h}(x-x_{i})={\frac {1}{nh}}\sum _{i=1}^{n}K{\Big (}{\frac {x-x_{i}}{h}}{\Big )} $$
+
+这里有两个参数: 核$K$和带宽h。[quora](https://quoradata.quora.com/Two-Sample-Hypothesis-Tests-for-Differences-in-Percentiles)、[wish](https://towardsdatascience.com/how-wish-a-b-tests-percentiles-35ee3e4589e7)采用了以下方式
+
+$$f(Q(\tau) = \frac{h}{\hat{Q}(\tau + h / 2) - \hat{Q}(\tau - h / 2)}$$
+
+其中带宽h根据具体的业务情况选择，大致的原则是"覆盖到整体的0.1%到1%的数据"。python的[stat.model](https://www.statsmodels.org/dev/_modules/statsmodels/regression/quantile_regression.html#QuantReg)、R的[quantreg](https://cran.r-project.org/web/packages/quantreg/vignettes/rq.pdf)、stata采用了更成熟的核密度估计方法，下面的代码实现了stat.model的默认估计方法，它是基于Epanechnikov核和hall_sheather带宽选择法。
+
+```{python}
+from typing import List, Callable
+import numpy as np
+import scipy.stats as stats
+from scipy.stats import norm
+
+def hall_sheather(n, tau, alpha=.05):
+    z = norm.ppf(tau)
+    num = 1.5 * norm.pdf(z)**2.
+    den = 2. * z**2. + 1.
+    h = n**(-1. / 3) * norm.ppf(1. - alpha / 2.)**(2./3) * (num / den)**(1./3)
+    return h
+
+# stat.model中quantreg的默认估计方法
+def desity_at_quantile(
+    x: List[float], 
+    tau: float, 
+    kernel: Callable[float, float] = lambda u: 3. / 4 * (1-u**2) * np.where(np.abs(u) <= 1, 1, 0), 
+    bandwidth: Callable[[float, float], float] = hall_sheather
+):
+    assert len(x) > 0
+    assert tau >= 0.0 and tau <= 1.0
+    
+    x = np.array(x)
+    nobs = len(x)
+    e = x - np.quantile(x, tau)
+
+    iqre = stats.scoreatpercentile(e, 75) - stats.scoreatpercentile(e, 25)
+    h = bandwidth(nobs, tau)
+    # Greene (2008, p.407) writes that Stata 6 uses this bandwidth:
+    # h = 0.9 * np.std(e) / (nobs**0.2)
+    # Instead, we calculate bandwidth as in Stata 12
+    h = min(np.std(x), iqre / 1.34) * (norm.ppf(tau + h) - norm.ppf(tau - h))
+    return 1. / (nobs * h) * np.sum(kernel(e / h))
+
+# quora的估计
+def desity_at_quantile_naive(x: List[float], tau: float, bandwidth: float = 0.005): 
+    return bandwidth / (np.quantile(x, tau + bandwidth / 2) - np.quantile(x, tau - bandwidth / 2))
+
+np.random.seed(0)
+x = np.random.normal(size = 100000)
+dq_sum, ndq_sum = 0.0, 0.0
+
+n = 0.0
+for i in range(1, 100):
+    tau = i * 0.01
+    tq = norm.pdf(norm.ppf(tau)) 
+    sq = desity_at_quantile(x, tau)
+    dq = sq - tq
+    dq_sum += abs(dq)
+    nsq = desity_at_quantile_naive(x, tau)
+    ndq = nsq - tq
+    ndq_sum += abs(ndq)
+    n += 1.0
+    # print(f"q: {q:6.4f}, true density: {tq:6.4f}, epa: {sq:6.4f}, naive: {nsq:6.4f}, epa error: {dq:8.4f}, naive error: {ndq:8.4f}")
+
+print(f"mean absolute error, epa: { (dq_sum / n):6.4f}, naive: { (ndq_sum / n):6.4f}")
+
+```
+
+可以看到，相比于quora的方案，stat.model的核密度估计效果更好一些。
+
+现在考虑实验的分位数处理效应QTE，或者$\Delta$, 显然有
+
+$$ QTE \sim \mathcal{N}(\hat{Q}_t(\tau) - \hat{Q}_c(\tau), \sqrt{Var(\hat{Q_t(\tau)}) + Var(\hat{Q_c(\tau)}}) $$
+
+这个结果对实验分组变量D（表示用户是实验组还是对照组）做分位数回归的结果是一致的。
+
+```{python}
+from typing import List, Callable
+import numpy as np
+import scipy.stats as stats
+from scipy.stats import norm
+import pandas as pd
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
 
 ## 非聚类情况的分位数检验
 
@@ -21,6 +114,185 @@ image: spotify.png
 $$ q(\tau) \sim \mathcal{N}(\hat{q}(\tau), \frac{\tau * (1 - \tau)}{n * f(\hat{q}(\tau))^2})) $$
 
 
+def quant_test(x: List[float], y: List[float], tau: float, conf_level: float = 0.95, alternative: str = 'two-sided'):
+    def estimate_var(x, tau):
+        return tau * (1 - tau) / (desity_at_quantile(x, tau) ** 2) / len(x)
+
+    assert tau >= 0.0 and tau <= 1.0
+
+    qx = np.quantile(x, tau)
+    qy = np.quantile(y, tau)
+    qte = qy - qx
+    stderr = np.sqrt(estimate_var(x, tau) + estimate_var(y, tau))
+
+    return (qte, stderr)
+    
+
+(n0, mu0, sd0) = (30000, 0.0, 1.0)
+(n1, mu1, sd1) = (31000, 0.2, 0.8)
+tau = 0.7
+tq = norm.pdf(tau, mu1, sd1) - norm.pdf(tau, mu0, sd0)  # 真实的qte
+x = np.random.normal(mu0, sd0, n0)
+y = np.random.normal(mu1, sd1, n1) 
+# (0.09097998111909678, 2.830236593580436)
+(qte, stderr) = quant_test(x, y, tau)
+print(f"quant_test, true qte: {tq:5.3f}, qte: {qte:5.3f}, std.err:{stderr:10.6f}")
+
+
+data = pd.DataFrame({'y': np.concatenate([x, y]), 't': np.repeat([0, 1], [n0, n1])})
+mod = smf.quantreg("y ~ t", data)
+res = mod.fit(q=tau, vcov='iid')
+# print(res.summary())
+print(f"stat model quant regression, true qte: {tq:5.3f}, qte: {res.params['t']:5.3f}, std.err:{res.bse['t']:10.6f}")
+
+
+import numpy as np
+import warnings
+import scipy.stats as stats
+from numpy.linalg import pinv
+from scipy.stats import norm
+
+q = tau
+b0 = np.quantile(x, q)
+beta = np.array([b0, qte])
+
+beta = res.params.to_numpy()
+exog = np.stack([np.repeat([1.0], [n0 + n1]), np.repeat([0.0, 1.0], [n0, n1])], axis=1)
+endog = data['y'].to_numpy()
+
+kernel = lambda u: 3. / 4 * (1-u**2) * np.where(np.abs(u) <= 1, 1, 0)
+bandwidth = hall_sheather
+
+nobs = endog.shape[0]
+e = endog - np.dot(exog, beta)
+# Greene (2008, p.407) writes that Stata 6 uses this bandwidth:
+# h = 0.9 * np.std(e) / (nobs**0.2)
+# Instead, we calculate bandwidth as in Stata 12
+iqre = stats.scoreatpercentile(e, 75) - stats.scoreatpercentile(e, 25)
+h = bandwidth(nobs, q)
+h = min(np.std(endog), iqre / 1.34) * (norm.ppf(q + h) - norm.ppf(q - h))
+fhat0 = 1. / (nobs * h) * np.sum(kernel(e / h))
+
+d = np.where(e > 0, (q/fhat0)**2, ((1-q)/fhat0)**2)
+xtxi = pinv(np.dot(exog.T, exog))
+xtdx = np.dot(exog.T * d[np.newaxis, :], exog)
+vcov = xtxi @ xtdx @ xtxi
+
+vcov = (1. / fhat0)**2 * q * (1 - q) * pinv(np.dot(exog.T, exog))
+np.sqrt(vcov[1, 1])
+
+    
+# pinv(np.dot(exog.T, exog)) * (n0 + n1)
+# exog = 
+# fhat0 = desity_at_quantile()
+
+```
+
+这两者的结果比较一致的，但有一点小的差别。
+
+$$
+    \sum_{g=1}^{G} X_g^T e_g e_g^T X_g =
+    \left[
+      \begin{array}{cccc}
+          e_1^T X_1\\
+          e_2^T X_2\\
+          \vdots\\
+          e_G^T X_G\\
+      \end{array}
+    \right]^T
+    \left[
+      \begin{array}{cccc}
+          e_1^T X_1\\
+          e_2^T X_2\\
+          \vdots\\
+          e_G^T X_G\\
+      \end{array}
+    \right]
+    $$
+
+
+```{r}
+n0 <- 1000
+mu0 <- 0.0
+sd0 <- 1.0
+n1 <- 1100
+mu1 <- 0.2
+sd1 <- 0.8
+
+y0 <- rnorm(n0, mu0, sd0)
+y1 <- rnorm(n1, mu1, sd1)
+# x <- rep(0:1, c(n0, n1))
+x <- matrix(rep(c(1, 0, 1), c(n0 + n1, n0, n1)), ncol = 2)
+# x <- matrix(rep(c(0, 1), c(n0, n1)), ncol = 1)
+y <- matrix(c(y0, y1), ncol = 1)
+
+
+wquantile <- function(x, y, tau = 0.5) {
+  o <- order(y / x)
+  b <- (y / x)[o]
+  w <- abs(x[o])
+  k <- sum(cumsum(w) < ((tau - 0.5) * sum(x) + 0.5 * sum(w)))
+  #   k <- sum(cumsum(w) < ((tau - 1.) * sum(x) + tau * sum(w)))
+  list(coef = b[k + 1], k = o[k + 1])
+}
+
+rqx <- function(x, y, tau = 0.5, max.it = 50) { # Barrodale and Roberts -- lite
+  p <- ncol(x)
+  n <- nrow(x)
+  h <- sample(1:n, size = p) # Phase I -- find a random (!) initial basis
+  it <- 0
+  repeat {
+    it <- it + 1
+    Xhinv <- solve(x[h, ])
+    bh <- Xhinv %*% y[h]
+    rh <- y - x %*% bh
+    # find direction of steepest descent along one of the edges
+    g <- -t(Xhinv) %*% t(x[-h, ]) %*% c(tau - (rh[-h] < 0))
+    g <- c(g + (1 - tau), -g + tau)
+    ming <- min(g)
+    if (ming >= 0 || it > max.it) break
+    h.out <- seq(along = g)[g == ming]
+    sigma <- ifelse(h.out <= p, 1, -1)
+    if (sigma < 0) h.out <- h.out - p
+    d <- sigma * Xhinv[, h.out]
+    # find step length by one-dimensional wquantile minimization
+    xh <- x %*% d
+    step <- wquantile(xh, rh, tau)
+    h.in <- step$k
+    h <- c(h[-h.out], h.in)
+  }
+  if (it > max.it) warning("non-optimal solution: max.it exceeded")
+  return(bh)
+}
+
+meketon <- function(x, y, eps = 1e-04, beta = 0.97) {
+  f <- lm.fit(x, y)
+  n <- length(y)
+  w <- rep(0, n)
+  d <- rep(1, n)
+  its <- 0
+  while (sum(abs(f$resid)) - crossprod(y, w) > eps) {
+    its <- its + 1
+    s <- f$resid * d
+    alpha <- max(pmax(s / (1 - w), -s / (1 + w)))
+    w <- w + (beta / alpha) * s
+    d <- pmin(1 - w, 1 + w)^2
+    f <- lm.wfit(x, y, d)
+  }
+  list(coef = f$coef, iterations = its)
+}
+
+tau <- 0.3
+# wquantile(t, xy, tau)$coef
+# quantile(y, tau) - quantile(x, tau)
+
+# sprintf("tau: %.4f, est: %.4f, act: %.4f", tau, wquantile(t, xy, tau)$coef, quantile(y, tau) - quantile(x, tau))
+meketon(x, y)$coef
+c(quantile(y0, tau), quantile(y1, tau) - quantile(y0, tau))
+
+sprintf("tau: %.4f, est: %.4f, act: %.4f", tau, rqx(x, y, tau), quantile(y1, tau) - quantile(y0, tau))
+
+```
 
 ### References
 
