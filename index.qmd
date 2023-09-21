@@ -1,5 +1,5 @@
 ---
-title: "test"
+title: "A/B、因果推断和强化学习"
 listing:
   contents: posts
   sort: "date desc"
