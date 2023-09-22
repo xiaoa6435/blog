@@ -192,6 +192,9 @@ np.sqrt(vcov[1, 1])
 
 这两者的结果比较一致的，但有一点小的差别。
 
+Computes $$\sum_{g=1}^{G} X_g^T e_g e_g^T X_g$$,
+    using the following identity
+    
 $$
     \sum_{g=1}^{G} X_g^T e_g e_g^T X_g =
     \left[
