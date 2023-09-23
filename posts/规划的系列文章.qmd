@@ -18,7 +18,7 @@ categories: [outline]
         - [ ] Clustered standard errors的估计
         - [x] 分位数指标的处理
         - [x] 时间片轮转实验的设计和处理
-        - bootstrap方法
+        - [ ] bootstrap方法
     - [ ] 基于spark的AB实验数据处理引擎
     - [ ] 基于多臂老虎机的实验引擎
 
