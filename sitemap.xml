@@ -2,30 +2,34 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://xiaoa6435.github.io/blog/about.html</loc>
-    <lastmod>2023-09-23T05:51:33.286Z</lastmod>
+    <lastmod>2023-09-23T07:22:10.181Z</lastmod>
   </url>
   <url>
     <loc>https://xiaoa6435.github.io/blog/posts/quantile-ab-test/quantile-regression.html</loc>
-    <lastmod>2023-09-23T05:51:31.797Z</lastmod>
+    <lastmod>2023-09-23T07:22:09.061Z</lastmod>
   </url>
   <url>
     <loc>https://xiaoa6435.github.io/blog/posts/switchback-experiment/index.html</loc>
-    <lastmod>2023-09-23T05:51:29.228Z</lastmod>
+    <lastmod>2023-09-23T07:22:07.713Z</lastmod>
   </url>
   <url>
     <loc>https://xiaoa6435.github.io/blog/posts/minimum-sample-size/index.html</loc>
-    <lastmod>2023-09-23T05:51:22.674Z</lastmod>
+    <lastmod>2023-09-23T07:22:02.436Z</lastmod>
+  </url>
+  <url>
+    <loc>https://xiaoa6435.github.io/blog/posts/规划的系列文章.html</loc>
+    <lastmod>2023-09-23T07:22:01.973Z</lastmod>
   </url>
   <url>
     <loc>https://xiaoa6435.github.io/blog/posts/post-with-online-code/index.html</loc>
-    <lastmod>2023-09-23T05:51:25.838Z</lastmod>
+    <lastmod>2023-09-23T07:22:05.703Z</lastmod>
   </url>
   <url>
     <loc>https://xiaoa6435.github.io/blog/posts/quantile-ab-test/index.html</loc>
-    <lastmod>2023-09-23T05:51:30.121Z</lastmod>
+    <lastmod>2023-09-23T07:22:08.547Z</lastmod>
   </url>
   <url>
     <loc>https://xiaoa6435.github.io/blog/index.html</loc>
-    <lastmod>2023-09-23T05:51:32.863Z</lastmod>
+    <lastmod>2023-09-23T07:22:09.858Z</lastmod>
   </url>
 </urlset>

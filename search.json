@@ -77,6 +77,27 @@
     "text": "最小样本量的计算\n最小样本量的计算公式基于以下参数：\n\n总体的方差：\\(\\sigma^2\\)。如果在实验前已经有了目标群体的数据，指标的方差就是很好的估计。特别的，如果是二分指标，比如是否付费，是否点击，总体的方差就是p * (1 - p), 这里的p是二分指标的转化率\n预期的提升MDE：\\(\\delta = \\mu_1 - \\mu_0\\), 预期实验组组的绝对提升量. 不失一般性，我们可以假设MDE &gt; 0\n设定的一类错误了\\(\\alpha\\)和二类错误率\\(\\beta\\)\n\n基于渐进正态分布假设, \\(\\delta \\sim N(\\delta, (\\frac{1}{n0} + \\frac{1}{n1}) * \\delta^2)\\)，其中\\(n_1\\), \\(n_0\\)分别是实验组和对照组的样本数。不妨定义 \\(\\frac{2}{\\widetilde{n}} = \\frac{1}{n0} + \\frac{1}{n1}\\), \\(\\widetilde{n}\\)就是\\(n_1\\), \\(n_0\\)的几何评价数，也是我们后面的最小样本数。简化后，\\(\\delta \\sim N(\\delta, \\frac{2\\delta^2}{\\widetilde{n}})\\)\n\n在H0下，实际的\\(\\delta = 0\\), 为了不犯一类错误，实际观察到的\\(\\bar{x}\\) 满足\n\n\\[ \\frac{\\bar{x} - 0}{(\\frac{2\\sigma^2}{\\widetilde{n}})}&lt;= \\Phi(1 - \\frac{\\alpha}{2}) \\]\n\n在H1下，实际的\\(\\delta = MDE\\), 为了不犯二类错误，实际观察到的\\(\\bar{x}\\) 满足\n\n\\[ \\frac{\\bar{x} - \\delta}{\\sqrt{\\frac{2\\sigma^2}{\\widetilde{n}}}} &gt;= \\Phi(\\beta) \\]\n两边乘以-1，有\n\\[ \\Rightarrow \\frac{\\delta - \\bar{x}}{\\sqrt{\\frac{2\\sigma^2}{\\widetilde{n}}}} &lt;=  \\Phi(1 - \\beta) \\]\n和H0的表达式相加，消去了\\(\\bar{x}\\)，有\n\\[ \\frac{\\delta}{\\sqrt{\\frac{2\\sigma^2}{\\widetilde{n}}}} &lt;= \\Phi(1 - \\beta) + \\Phi(1 - \\frac{\\alpha}{2}) \\]\n\\[ \\Rightarrow \\widetilde{n} &gt;= 2(\\Phi(\\beta) + \\Phi(1 - \\frac{\\alpha}{2}))^2 * \\frac{\\sigma^2}{\\delta^2} \\]\n记\\(K(\\alpha, \\beta) = 2(\\Phi(\\beta) + \\Phi(1 - \\frac{\\alpha}{2}))^2\\), 有\n\\[ \\widetilde{n} &gt;= K(\\alpha, \\beta) * \\frac{\\sigma^2}{\\delta^2} \\]\n这个公式非常符合直觉：\n\n最小样本量\\(\\widetilde{n}\\)和\\(K(\\alpha, \\beta)\\)成正比，\\(\\alpha\\)和\\(\\beta\\)越小，需要的样本量越大\n最小样本量\\(\\widetilde{n}\\)和\\(\\delta^2\\)成反比，实验的效应如果很明显，那么需要的样本量会比较少\n最小样本量\\(\\widetilde{n}\\)和\\(\\sigma^2\\)成正比，指标的波动性越大，需要的样本量越大\n\n最小样本量(minimum sample size)是A/B测试领域经常涉及到的话题,它有个很出名的简化了的经验公式：\n一般默认\\(\\alpha = 0.05\\)和\\(\\beta = 0.20\\)\n\\[ K(\\alpha, \\beta) = 2 * (\\Phi(1 - 0.2) + \\Phi(1 - 0.05 / 2)) \\] \\[ = 2 * (qnorm(1 - 0.2) + qnorm(1 - 0.05 / 2)) ** 2 \\approx 16 \\]\n这就是我们经常见到的这个经验公式 \\[ n = 16 * \\sigma^2 / \\delta^2 \\]\n关于这个公式，有几个值得注意的点：\n\nn是实验组对照组单独的，即实验组和对照组分别至少需要n, 如果实验组和对照组不是等分的，这里的n最接近实验组和对照组人数的几何平均\nn是相对实验的分析粒度的，除了部分时间片轮转实验以外，大部分实验的粒度都不是按天的\n\n对于0/1指标，\\(\\sigma^2 = p * (1 - p)\\), \\(\\delta\\)就是预期的转化率的绝对提升。举个例子，假设大盘的点击率是0.05，现在算法有了迭代，预期点击率的相对提升1%，绝对提升0.05 * 0.01 = 0.0005. 根据上面的公式，最小样本量 n = 16 * 0.05 * (1 - 0.05) / (0.0005 ** 2) = 3040000. 总样本接近6百万（3040000 * 2)。这个简单的例子可以帮我们一个迷思：相对于经典实验，比如心理学实验、农业实验、药物实验。互联网实验的样本大了很多数量级，那经典的假设检验和p value还有效吗？几百万几千万的样本是不是足够检验出任意小的差异？从上面的具体例子看，这个说法大部分是不成立的，在我们的设定中，新算法能相对提升1%，这不是一个很容易做的事情，但这里的样本量已经达成了600万。"
   },
   {
+    "objectID": "posts/规划的系列文章.html",
+    "href": "posts/规划的系列文章.html",
+    "title": "规划的系列文章",
+    "section": "",
+    "text": "A/B test:\n\n实验前\n\nhash是合适的随机数生成器吗？\n实验设计的问题：完全随机、分层/区组随机\n再随机化(Rerandomization)实验的设计和数据处理\n平不平的问题：除非你的分流足够随机？\n最小样本量的估计和一些实际的问题\n\n实验数据处理\n\n0/1、计数和连续变量的分析\nClustered standard errors的估计\n分位数指标的处理\n时间片轮转实验的设计和处理\nbootstrap方法\n\n基于spark的AB实验数据处理引擎\n基于多臂老虎机的实验引擎\n\n因果推断评估：观察性数据的估计\n\n回归、匹配和psm\nSCM、DID和SDID\n\n因果推断估计：个体处理效应估计\n\nuplift/causal forest的评估问题\nuplift/causal forest的spark实现\nDRL、DML及其他\n\n[] 强化学习\n\nQ学习\n策略学习\n\nppo"
+  },
+  {
+    "objectID": "posts/规划的系列文章.html#规划题目",
+    "href": "posts/规划的系列文章.html#规划题目",
+    "title": "规划的系列文章",
+    "section": "",
+    "text": "A/B test:\n\n实验前\n\nhash是合适的随机数生成器吗？\n实验设计的问题：完全随机、分层/区组随机\n再随机化(Rerandomization)实验的设计和数据处理\n平不平的问题：除非你的分流足够随机？\n最小样本量的估计和一些实际的问题\n\n实验数据处理\n\n0/1、计数和连续变量的分析\nClustered standard errors的估计\n分位数指标的处理\n时间片轮转实验的设计和处理\nbootstrap方法\n\n基于spark的AB实验数据处理引擎\n基于多臂老虎机的实验引擎\n\n因果推断评估：观察性数据的估计\n\n回归、匹配和psm\nSCM、DID和SDID\n\n因果推断估计：个体处理效应估计\n\nuplift/causal forest的评估问题\nuplift/causal forest的spark实现\nDRL、DML及其他\n\n[] 强化学习\n\nQ学习\n策略学习\n\nppo"
+  },
+  {
+    "objectID": "posts/规划的系列文章.html#核心原则",
+    "href": "posts/规划的系列文章.html#核心原则",
+    "title": "规划的系列文章",
+    "section": "核心原则",
+    "text": "核心原则\n\n重点关心方法/算法的核心逻辑、背后的直觉和实际的影响，而不是推导/理论的的严格性\n突出算法及其相应的代码实现问题，强调代码工程问题\n在线的交互式的演示"
+  },
+  {
     "objectID": "posts/post-with-online-code/index.html",
     "href": "posts/post-with-online-code/index.html",
     "title": "Post With Live Code",
@@ -116,6 +137,6 @@
     "href": "index.html",
     "title": "A/B、因果推断和强化学习",
     "section": "",
-    "text": "最小样本量\n\n\n\n\n\n\n\nA/B test\n\n\nminimum sample size\n\n\n\n\n\n\n\n\n\n\n\n2023-09-19\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\n时间片轮转实验的设计和分析\n\n\n\n\n\n\n\nA/B test\n\n\nswitchback experiment\n\n\n\n\n\n\n\n\n\n\n\n2023-09-19\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\nA/B test中分位数指标的处理\n\n\n\n\n\n\n\nA/B test\n\n\nquantile test\n\n\n\n\n\n\n\n\n\n\n\n2023-09-18\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\n分位数回归的原理、代码实现和聚类标准误\n\n\n\n\n\n\n\nA/B test\n\n\nquantile regression\n\n\nclustered standard errors\n\n\n\n\n\n\n\n\n\n\n\n2023-09-18\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\nPost With Live Code\n\n\n\n\n\n\n\nshinylive\n\n\nquarto\n\n\n\n\n\n\n\n\n\n\n\n2023-09-15\n\n\n张振昊\n\n\n\n\n\n\nNo matching items"
+    "text": "规划的系列文章\n\n\n\n\n\n\n\noutline\n\n\n\n\n\n\n\n\n\n\n\n2023-09-23\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\n最小样本量\n\n\n\n\n\n\n\nA/B test\n\n\nminimum sample size\n\n\n\n\n\n\n\n\n\n\n\n2023-09-19\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\n时间片轮转实验的设计和分析\n\n\n\n\n\n\n\nA/B test\n\n\nswitchback experiment\n\n\n\n\n\n\n\n\n\n\n\n2023-09-19\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\nA/B test中分位数指标的处理\n\n\n\n\n\n\n\nA/B test\n\n\nquantile test\n\n\n\n\n\n\n\n\n\n\n\n2023-09-18\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\n分位数回归的原理、代码实现和聚类标准误\n\n\n\n\n\n\n\nA/B test\n\n\nquantile regression\n\n\nclustered standard errors\n\n\n\n\n\n\n\n\n\n\n\n2023-09-18\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\nPost With Live Code\n\n\n\n\n\n\n\nshinylive\n\n\nquarto\n\n\n\n\n\n\n\n\n\n\n\n2023-09-15\n\n\n张振昊\n\n\n\n\n\n\nNo matching items"
   }
 ]
