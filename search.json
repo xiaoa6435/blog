@@ -63,13 +63,6 @@
     "text": "测试\n\nimport rpy2\nfrom rpy2 import robjects\n\ndef uniform(low=0.0, high=1.0):\n    return rpy2.robjects.r(f'runif(1, {low}, {high})')[0]\nrandom.uniform = uniform\n\ndef gauss(mu=0.0, sigma=1.0):\n    return rpy2.robjects.r(f'rnorm(1, {mu}, {sigma})')[0]\nrandom.gauss = gauss\n\ntime_horizon = 120\nm = 2\np = 0.5\nrandomization_points = generate_opt_design(time_horizon, m)\nrandomization_points == [0, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 102, 104, 106, 108, 110, 112, 114, 116]\n\nrpy2.robjects.r('set.seed(111111)')\nassignment_path = generate_assignment_path(randomization_points, time_horizon, m)\nassignment_path == [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]\n\nrpy2.robjects.r('set.seed(111111)')\ntau = [1.0, 1.0, 1.0]\nnew = generate_outcome(assignment_path, tau)\n\nold = [0.434833396762166, 4.16060424082402, 2.91790649574515, 1.39691331193944, 1.89948806343165, 1.03413730352493, 2.15911140118438, 0.726763259743356, 2.92463672663345, 4.58618087124496, 4.18384842961183, 3.1231545672721, 3.21073297148204, 3.47490426238806, 3.56474787955819, 2.54866565554569, 4.91954787364933, 4.88928321075681, 4.9743504050517, 2.70367936403911, 2.95728735703276, 2.98231567022872, 3.15047612777084, 4.75759922483731, 4.21003885524797, 4.18157462124439, 3.98018891962639, 1.16235745274864, 3.50045561681502, 4.71330628773, 7.41427588498954, 7.58288977468063, 3.66055128679812, 6.66440465565843, 7.76594302836741, 6.77364773746862, 6.81486072393467, 7.17627340036311, 6.94461498042583, 4.95567982004171, 4.134366340668, 4.77460987865831, 3.66956005339461, 4.66945960334466, 6.96777432423419, 8.82477105962375, 7.93560696678956, 7.09219170394525, 7.41808254583203, 6.72985155755407, 6.17527976040663, 5.50046812367082, 5.36712241699065, 6.55157620396049, 6.6043594442257, 4.3693445377948, 4.19116981629592, 7.11932150789102, 7.20109572388284, 4.52958187431917, 5.65838275247701, 5.59302894651198, 7.64497906403363, 7.05994580978854, 6.42953658082273, 4.93605896614588, 4.57012924056999, 5.13460375030383, 3.98956716798835, 4.5981473775092, 5.24111915320301, 6.76715647313569, 6.48136089503326, 3.3390609421107, 4.38550261887666, 4.00281801241419, 5.63593883392727, 4.51114882325828, 6.69375332242523, 6.67908667999775, 7.76266602632671, 7.45073549720124, 8.07512244608518, 8.18160320073618, 7.31424756022565, 6.33777035346318, 8.29799454274423, 7.86514809758498, 6.40034682322799, 5.61428130970244, 6.26500016482481, 5.98545855080484, 9.56853136084471, 8.27671475492981, 8.12184976500245, 7.68740785084192, 5.47432743435136, 6.66885979993122, 5.27395984151641, 5.97031188315572, 5.27049863949522, 5.25857394090524, 5.51198076300874, 7.90167715761987, 6.1132133505048, 4.17501094237396, 4.36195238641099, 5.938491498465, 3.64356687366051, 3.31405838215769, 6.66062556034787, 4.40917856947105, 7.63688284192356, 9.25694462626588, 8.20932808339688, 5.74591373194745, 6.52468337004635, 7.62154595985734, 2.27443244264151, 4.38031586688583]\nsum(1 if abs(i - j) &lt; 1.0e-10 else 0 for (i, j) in zip(new, old)) == time_horizon\n\npotential_outcome_path = new\nnew_est = estimate_tau(\n  randomization_points, \n  assignment_path, \n  potential_outcome_path, \n  m\n)\nabs(new_est[0] - 6.295755) &lt; 1.0e-6\n\nvar1 = generate_ub_variance_opt_design(randomization_points, assignment_path, potential_outcome_path, m, 1)\nvar2 = generate_ub_variance_opt_design(randomization_points, assignment_path, potential_outcome_path, m, 2)\nabs(var1 - 10.798) &lt; 1.0e-3\nabs(var2 - 10.307) &lt; 1.0e-3\n\n\nrpy2.robjects.r('set.seed(111111)')\np_value = fisher_test_switchback(\n  randomization_points,\n  assignment_path, \n  potential_outcome_path, \n  m, 10000\n)\nabs(p_value - 0.032) &lt; 1.0e-3"
   },
   {
-    "objectID": "posts/welcome/index.html",
-    "href": "posts/welcome/index.html",
-    "title": "Welcome To My Blog",
-    "section": "",
-    "text": "This is the first post in a Quarto blog. Welcome!\n\nSince this post doesn’t specify an explicit image, the first image in the post will be used in the listing page of posts."
-  },
-  {
     "objectID": "posts/minimum-sample-size/index.html",
     "href": "posts/minimum-sample-size/index.html",
     "title": "最小样本量",
@@ -86,14 +79,14 @@
   {
     "objectID": "posts/post-with-online-code/index.html",
     "href": "posts/post-with-online-code/index.html",
-    "title": "Post With Code",
+    "title": "Post With Live Code",
     "section": "",
     "text": "python -m pip install shinylive\nquarto add quarto-ext/shinylive\nquarto install tinytex # pdf"
   },
   {
     "objectID": "posts/post-with-online-code/index.html#参考文献引用",
     "href": "posts/post-with-online-code/index.html#参考文献引用",
-    "title": "Post With Code",
+    "title": "Post With Live Code",
     "section": "参考文献引用",
     "text": "参考文献引用\n引用 Liu et al. (2019) 的文章\n\nReferences\n\n\nLiu, Min, Xiaohui Sun, Maneesh Varshney, and Ya Xu. 2019. “Large-Scale Online Experimentation with Quantile Metrics.” arXiv Preprint arXiv:1903.08762."
   },
@@ -123,6 +116,6 @@
     "href": "index.html",
     "title": "A/B、因果推断和强化学习",
     "section": "",
-    "text": "最小样本量\n\n\n\n\n\n\n\nA/B test\n\n\nminimum sample size\n\n\n\n\n\n\n\n\n\n\n\nSep 19, 2023\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\n时间片轮转实验的设计和分析\n\n\n\n\n\n\n\nA/B test\n\n\nswitchback experiment\n\n\n\n\n\n\n\n\n\n\n\nSep 19, 2023\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\nA/B test中分位数指标的处理\n\n\n\n\n\n\n\nA/B test\n\n\nquantile test\n\n\n\n\n\n\n\n\n\n\n\nSep 18, 2023\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\n分位数回归的原理、代码实现和聚类标准误\n\n\n\n\n\n\n\nA/B test\n\n\nquantile regression\n\n\nclustered standard errors\n\n\n\n\n\n\n\n\n\n\n\nSep 18, 2023\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\nPost With Code\n\n\n\n\n\n\n\nnews\n\n\ncode\n\n\nanalysis\n\n\n\n\n\n\n\n\n\n\n\nSep 15, 2023\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\nWelcome To My Blog\n\n\n\n\n\n\n\nnews\n\n\n\n\n\n\n\n\n\n\n\nSep 12, 2023\n\n\n张振昊\n\n\n\n\n\n\nNo matching items"
+    "text": "最小样本量\n\n\n\n\n\n\n\nA/B test\n\n\nminimum sample size\n\n\n\n\n\n\n\n\n\n\n\n2023-09-19\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\n时间片轮转实验的设计和分析\n\n\n\n\n\n\n\nA/B test\n\n\nswitchback experiment\n\n\n\n\n\n\n\n\n\n\n\n2023-09-19\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\nA/B test中分位数指标的处理\n\n\n\n\n\n\n\nA/B test\n\n\nquantile test\n\n\n\n\n\n\n\n\n\n\n\n2023-09-18\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\n分位数回归的原理、代码实现和聚类标准误\n\n\n\n\n\n\n\nA/B test\n\n\nquantile regression\n\n\nclustered standard errors\n\n\n\n\n\n\n\n\n\n\n\n2023-09-18\n\n\n张振昊\n\n\n\n\n\n\n  \n\n\n\n\nPost With Live Code\n\n\n\n\n\n\n\nshinylive\n\n\nquarto\n\n\n\n\n\n\n\n\n\n\n\n2023-09-15\n\n\n张振昊\n\n\n\n\n\n\nNo matching items"
   }
 ]
