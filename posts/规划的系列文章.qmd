@@ -31,7 +31,7 @@ categories: [outline]
     - uplift/causal forest的spark实现
     - DRL、DML及其他
 
-- [] 强化学习
+- [ ] 强化学习
     - [ ] Q学习
     - [ ] 策略学习
         - [ ] ppo
