@@ -150,7 +150,7 @@ import numpy.typing as npt
 import warnings
 from typing import Optional
 
-def hall_sheather(n, q, alpha=.05):
+def hall_sheather(n: int, q: float, alpha: float = .05):
     z = norm.ppf(q)
     num = 1.5 * norm.pdf(z)**2.
     den = 2. * z**2. + 1.
@@ -216,29 +216,32 @@ tau = 0.6
 res = mod.fit(tau, cov_type='cluster', cov_kwds={'groups': groups})
 beta = res.params
 print(f"tau: {tau}, b: {beta}, stderr: {res.bse}")
-# tau: 0.6, b: [38.2355112  -5.40712834], stderr: [1.48802353 2.39916696]
 var = estimate_cov(X, y, beta, tau, groups)
 np.isclose(np.abs(np.sqrt(np.diag(var))), res.bse)
-
-
-# (psi_resid == pyqreg.c.cluster_cov.psi_function(resid, tau)).all()
-# A_c = pyqreg.c.matrix_opaccum.matrix_opaccum(
-#     np.array(X, np.double, copy=True, order="F", ndmin=1), 
-#     groups, psi_resid, 
-#     len(np.unique(groups))
-# )
-# (A - A_c < 1e-6).all()
-
-# B_c = pyqreg.c.matrix_opaccum.matrix_opaccum(
-#     np.array(X, np.double, copy=True, order="F", ndmin=1), 
-#     np.arange(len(groups)).astype(np.int32), 
-#     dens.astype(np.float64), 
-#     n
-# )
-# (B - B_c < 1e-6).all()
-# (B_inv - pyqreg.c.blas_lapack.lapack_cholesky_inv(B.copy()) < 1e-6).all()
-# from pyqreg.c.stats import invnormal, normalden
-
-
 ```
 
+
+# 附
+
+## psi_function和matrix_opaccum测试
+```{python}
+#| eval: false
+
+(psi_resid == pyqreg.c.cluster_cov.psi_function(resid, tau)).all()
+A_c = pyqreg.c.matrix_opaccum.matrix_opaccum(
+    np.array(X, np.double, copy=True, order="F", ndmin=1), #这里需要改内存布局
+    groups, psi_resid, 
+    len(np.unique(groups))
+)
+(A - A_c < 1e-6).all()
+
+B_c = pyqreg.c.matrix_opaccum.matrix_opaccum(
+    np.array(X, np.double, copy=True, order="F", ndmin=1), 
+    np.arange(X.shape[0]).astype(np.int32), 
+    dens.astype(np.float64), 
+    len(X.shape[0])
+)
+(B - B_c < 1e-6).all()
+(B_inv - pyqreg.c.blas_lapack.lapack_cholesky_inv(B.copy()) < 1e-6).all()
+from pyqreg.c.stats import invnormal, normalden
+```
