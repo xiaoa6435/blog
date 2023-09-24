@@ -18,8 +18,6 @@ $$ \beta_{\tau} = \mathop{\arg\min}\limits_{q(X)} E[\rho_\tau(Y - X\beta)] $$
 
 线性规划、内点法、迭代加权最小二乘法(IRLS: Iteratively reweighted least squares)都可以估计$\beta_{\tau}$, R的[quantreg](https://github.com/cran/quantreg/)和[pyqreg](https://github.com/mozjay0619/pyqreg)采用了内点法, statsmodels的quantile_regression采用IRLS。IRLS的实现比较简单，下面是示例的代码。
 
-/Users/zhangzhenhao/Library/Python/3.7/bin
-
 ```{python}
 import numpy as np
 import numpy.typing as npt
@@ -91,53 +89,25 @@ print(f"beta:{beta}, y0的tau分位数: {q0}, y1的tau分位数 - y0的tau分位
 
 ## 协方差矩阵估计
 
-在残差满足i.i.d假设下，$\beta$的协方差矩阵渐进于以下公式：
+分位数回归的标准误比较复杂。这里我们反过来，先考虑最复杂也最通用的场景出发，然后逐步简化，得到更简单情况下的标准误差。 $\{(y_{gi}, x_{gi})\}, g = 0, 1, 2, ..., (n_g - 1)$，表示各个整群，每个整群分别有$n_g$个个体。这是分位数模型可以表示为：
 
-$$ \sqrt{n}(\hat{\beta}(\tau) - {\beta}(\tau)) \sim \frac{\tau * (1 - \tau)}{f_{\mu_{\tau}}(0|X_i)}(X^{'}X)^{-1} $$, 
+$$ y_{gi} = x_{gi}\beta(\tau) + u(\tau)_{gi} $$
 
-如果有异方差的问题
+$\beta(\tau)$的聚类稳健标准误的渐进公式如下：
 
-$$ \sqrt{n}(\hat{\beta}(\tau) - {\beta}(\tau)) \sim \frac{\tau * (1 - \tau)}{f_{\mu_{\tau}}(0|X_i)}(X^{'}X)^{-1} $$
+$$ \sqrt{n}(\hat{\beta}(\tau) - {\beta}(\tau)) \sim B^{-1}AB^{-1} $$
 
+这里$B = f_{\mu_{\tau}}(0|X)X^{'}X$, $f_{\mu_{\tau}}$是残差在0处的概率密度, $A = Xe^{'}Xe$。 Xe的计算方式如下：对每个整群，分别计算$\sum_{n=0}^{n_g - 1} X * \phi(\tau) = \sum_{n=0}^{n_g - 1} X * (\tau - \mathbb{1}(y - x\beta(\tau)))$，因此Xe的维度是[G, p], G是整群的个数。 
 
-```{python}
-from typing import List, Callable
-import numpy as np
-import scipy.stats as stats
-from scipy.stats import norm
+如果$n_g = 1$, 也就是没有整群的情况，这里A的计算简化为
+$$ A = (Xe)^{'}(Xe), e = \tau - \mathbb{1}(y - x\beta(\tau) $$
 
-def hall_sheather(n, tau, alpha=.05):
-    z = norm.ppf(tau)
-    num = 1.5 * norm.pdf(z)**2.
-    den = 2. * z**2. + 1.
-    h = n**(-1. / 3) * norm.ppf(1. - alpha / 2.)**(2./3) * (num / den)**(1./3)
-    return h
+这个公式和下面的稳健标准误差有些差异，但基本是等价的( @kim2003estimation).
 
-# stat.model中quantreg的默认估计方法
-def desity_at_quantile(
-    x: List[float], 
-    tau: float, 
-    kernel: Callable[float, float] = lambda u: 3. / 4 * (1-u**2) * np.where(np.abs(u) <= 1, 1, 0), 
-    bandwidth: Callable[[float, float], float] = hall_sheather
-):
-    assert len(x) > 0
-    assert tau >= 0.0 and tau <= 1.0
-    
-    x = np.array(x)
-    nobs = len(x)
-    e = x - np.quantile(x, tau)
+$$ \sqrt{n}(\hat{\beta}(\tau) - {\beta}(\tau)) \sim {\tau * (1 - \tau)} H^{-1}JH^{-1} $$
 
-    iqre = stats.scoreatpercentile(e, 75) - stats.scoreatpercentile(e, 25)
-    h = bandwidth(nobs, tau)
-    # Greene (2008, p.407) writes that Stata 6 uses this bandwidth:
-    # h = 0.9 * np.std(e) / (nobs**0.2)
-    # Instead, we calculate bandwidth as in Stata 12
-    h = min(np.std(x), iqre / 1.34) * (norm.ppf(tau + h) - norm.ppf(tau - h))
-    return 1. / (nobs * h) * np.sum(kernel(e / h))
-
-
-```
-
+其中, $H = f_{\mu_{\tau}}(0|X)X^{'}X$, $J = X^{'}X$, 其中$f_{\mu_{\tau}}$式残差在0处的概率密度。如果残差是独立同分布的，即i.i.d, 这个公式可以简化为：
+$$ \sqrt{n}(\hat{\beta}(\tau) - {\beta}(\tau)) \sim \frac{\tau * (1 - \tau)}{f_{\mu_{\tau}}(0)}(X^{'}X)^{-1} $$
 
 ```{python}
 from pyqreg.utils import generate_clustered_data, rng_generator
@@ -216,8 +186,19 @@ tau = 0.6
 res = mod.fit(tau, cov_type='cluster', cov_kwds={'groups': groups})
 beta = res.params
 print(f"tau: {tau}, b: {beta}, stderr: {res.bse}")
+# tau: 0.6, b: [38.2355112  -5.40712834], stderr: [1.48802353 2.39916696]
 var = estimate_cov(X, y, beta, tau, groups)
 np.isclose(np.abs(np.sqrt(np.diag(var))), res.bse)
+
+# res = mod.fit(tau, cov_type='cluster', cov_kwds={'groups': np.arange(X.shape[0], dtype=np.int32)})
+# beta = res.params
+# print(f"tau: {tau}, b: {beta}, stderr: {res.bse}")
+# tau: 0.6, b: [38.2355112  -5.40712834], stderr: [0.13339603 0.20429163]
+
+# res = mod.fit(tau, cov_type='robust')
+# beta = res.params
+# print(f"tau: {tau}, b: {beta}, stderr: {res.bse}")
+# tau: 0.6, b: [38.2355112  -5.40712834], stderr: [0.13718336 0.19939666]
 ```
 
 
