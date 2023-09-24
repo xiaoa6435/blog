@@ -81,14 +81,14 @@
     "href": "posts/规划的系列文章.html",
     "title": "规划的系列文章",
     "section": "",
-    "text": "A/B test:\n\n实验前\n\nhash是合适的随机数生成器吗？\n实验设计的问题：完全随机、分层/区组随机\n再随机化(Rerandomization)实验的设计和数据处理\n平不平的问题：除非你的分流足够随机？\n最小样本量的估计和一些实际的问题\n\n实验数据处理\n\n0/1、计数和连续变量的分析\nClustered standard errors的估计\n分位数指标的处理\n时间片轮转实验的设计和处理\nbootstrap方法\n\n基于spark的AB实验数据处理引擎\n基于多臂老虎机的实验引擎\n\n因果推断评估：观察性数据的估计\n\n回归、匹配和psm\nSCM、DID和SDID\n\n因果推断估计：个体处理效应估计\n\nuplift/causal forest的评估问题\nuplift/causal forest的spark实现\nDRL、DML及其他\n\n强化学习\n\nQ学习\n策略学习\n\nppo"
+    "text": "A/B test:\n\n实验前\n\nhash是合适的随机数生成器吗？\n实验设计的问题：完全随机、分层/区组随机\n再随机化(Rerandomization)实验的设计和数据处理\n平不平的问题：除非你的分流足够随机？\n最小样本量的估计和一些实际的问题\n\n实验数据处理\n\n0/1、计数和连续变量的分析\nClustered standard errors的估计\n分位数指标的处理\n时间片轮转实验的设计和处理\nbootstrap方法\n\n基于spark的AB实验数据处理引擎\n基于多臂老虎机的实验引擎\n\n因果推断评估：观察性数据的估计\n\n回归、匹配和psm\nSCM、DID和SDID\n\n因果推断估计：个体处理效应估计\n\nuplift/causal forest的评估问题\nuplift/causal forest的spark实现\nDRL、DML及其他\n\n强化学习\n\nQ学习\n策略学习\n\nppo\n\n\nspark-causalml系列"
   },
   {
     "objectID": "posts/规划的系列文章.html#规划题目",
     "href": "posts/规划的系列文章.html#规划题目",
     "title": "规划的系列文章",
     "section": "",
-    "text": "A/B test:\n\n实验前\n\nhash是合适的随机数生成器吗？\n实验设计的问题：完全随机、分层/区组随机\n再随机化(Rerandomization)实验的设计和数据处理\n平不平的问题：除非你的分流足够随机？\n最小样本量的估计和一些实际的问题\n\n实验数据处理\n\n0/1、计数和连续变量的分析\nClustered standard errors的估计\n分位数指标的处理\n时间片轮转实验的设计和处理\nbootstrap方法\n\n基于spark的AB实验数据处理引擎\n基于多臂老虎机的实验引擎\n\n因果推断评估：观察性数据的估计\n\n回归、匹配和psm\nSCM、DID和SDID\n\n因果推断估计：个体处理效应估计\n\nuplift/causal forest的评估问题\nuplift/causal forest的spark实现\nDRL、DML及其他\n\n强化学习\n\nQ学习\n策略学习\n\nppo"
+    "text": "A/B test:\n\n实验前\n\nhash是合适的随机数生成器吗？\n实验设计的问题：完全随机、分层/区组随机\n再随机化(Rerandomization)实验的设计和数据处理\n平不平的问题：除非你的分流足够随机？\n最小样本量的估计和一些实际的问题\n\n实验数据处理\n\n0/1、计数和连续变量的分析\nClustered standard errors的估计\n分位数指标的处理\n时间片轮转实验的设计和处理\nbootstrap方法\n\n基于spark的AB实验数据处理引擎\n基于多臂老虎机的实验引擎\n\n因果推断评估：观察性数据的估计\n\n回归、匹配和psm\nSCM、DID和SDID\n\n因果推断估计：个体处理效应估计\n\nuplift/causal forest的评估问题\nuplift/causal forest的spark实现\nDRL、DML及其他\n\n强化学习\n\nQ学习\n策略学习\n\nppo\n\n\nspark-causalml系列"
   },
   {
     "objectID": "posts/规划的系列文章.html#核心原则",
