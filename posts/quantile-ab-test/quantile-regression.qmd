@@ -89,7 +89,7 @@ print(f"beta:{beta}, y0的tau分位数: {q0}, y1的tau分位数 - y0的tau分位
 
 ## 协方差矩阵估计
 
-分位数回归的标准误比较复杂。这里我们反过来，先考虑最复杂也最通用的场景出发，然后逐步简化，得到更简单情况下的标准误差。 $\{(y_{gi}, x_{gi})\}, g = 0, 1, 2, ..., (n_g - 1)$，表示各个整群，每个整群分别有$n_g$个个体。这是分位数模型可以表示为：
+分位数回归的渐进标准误比较复杂。这里我们反过来，先考虑最复杂也最通用的场景出发，然后逐步简化，得到更简单情况下的标准误。 对$\{(y_{gi}, x_{gi})\}, g = 0, 1, 2, ..., (n_g - 1)$，表示各个整群，每个整群分别有$n_g$个个体，分位数模型可以表示为：
 
 $$ y_{gi} = x_{gi}\beta(\tau) + u(\tau)_{gi} $$
 
@@ -97,7 +97,13 @@ $\beta(\tau)$的聚类稳健标准误的渐进公式如下：
 
 $$ \sqrt{n}(\hat{\beta}(\tau) - {\beta}(\tau)) \sim B^{-1}AB^{-1} $$
 
-这里$B = f_{\mu_{\tau}}(0|X)X^{'}X$, $f_{\mu_{\tau}}$是残差在0处的概率密度, $A = Xe^{'}Xe$。 Xe的计算方式如下：对每个整群，分别计算$\sum_{n=0}^{n_g - 1} X * \phi(\tau) = \sum_{n=0}^{n_g - 1} X * (\tau - \mathbb{1}(y - x\beta(\tau)))$，因此Xe的维度是[G, p], G是整群的个数。 
+$B = f_{\mu_{\tau}}(0|X)X^{'}X$, $f_{\mu_{\tau}}$是残差在0处的概率密度，这个表达式比较难算，实际实现是基于下面的逻辑：
+
+$$ \hat{B} = X_d^{'}X_d, X_d = \sqrt{\frac{\mathbb{1}(-\delta_G \leq y - x\beta(\tau) \leq \delta_G)}{2\delta_GG}X} $$, 
+
+$\delta_G$是带宽函数，和估计估计密度的类似。
+
+$A = Xe^{'}Xe$。 Xe的计算方式如下：对每个整群，分别计算$\sum_{n=0}^{n_g - 1} X * \phi(\tau) = \sum_{n=0}^{n_g - 1} X * (\tau - \mathbb{1}(y - x\beta(\tau)))$，因此Xe的维度是[G, p], G是整群的个数。 
 
 如果$n_g = 1$, 也就是没有整群的情况，这里A的计算简化为
 $$ A = (Xe)^{'}(Xe), e = \tau - \mathbb{1}(y - x\beta(\tau) $$
@@ -106,8 +112,11 @@ $$ A = (Xe)^{'}(Xe), e = \tau - \mathbb{1}(y - x\beta(\tau) $$
 
 $$ \sqrt{n}(\hat{\beta}(\tau) - {\beta}(\tau)) \sim {\tau * (1 - \tau)} H^{-1}JH^{-1} $$
 
-其中, $H = f_{\mu_{\tau}}(0|X)X^{'}X$, $J = X^{'}X$, 其中$f_{\mu_{\tau}}$式残差在0处的概率密度。如果残差是独立同分布的，即i.i.d, 这个公式可以简化为：
-$$ \sqrt{n}(\hat{\beta}(\tau) - {\beta}(\tau)) \sim \frac{\tau * (1 - \tau)}{f_{\mu_{\tau}}(0)}(X^{'}X)^{-1} $$
+其中, $H = f_{\mu_{\tau}}(0|X)X^{'}X$, $J = X^{'}X$, 其中$f_{\mu_{\tau}}$式残差在0处的概率密度。如果残差是独立同分布的，即i.i.d, 这个公式可以进一步简化为：
+$$ \sqrt{n}(\hat{\beta}(\tau) - {\beta}(\tau)) \sim \frac{\tau * (1 - \tau)}{f_{\mu_{\tau}}(0)}(X^{'}X)^{-1} $$。
+
+下面的代码实现了clusterr standard error和robust standard error(groups = None)。i.i.d的情况比较简单，这里不多叙述，感兴趣的可以参考[statsmodels中quantile_regression的实现](https://www.statsmodels.org/dev/_modules/statsmodels/regression/quantile_regression.html#QuantReg)。
+
 
 ```{python}
 from pyqreg.utils import generate_clustered_data, rng_generator
@@ -201,6 +210,11 @@ np.isclose(np.abs(np.sqrt(np.diag(var))), res.bse)
 # tau: 0.6, b: [38.2355112  -5.40712834], stderr: [0.13718336 0.19939666]
 ```
 
+### References
+
+::: {#refs}
+:::
+
 
 # 附
 
@@ -225,4 +239,39 @@ B_c = pyqreg.c.matrix_opaccum.matrix_opaccum(
 (B - B_c < 1e-6).all()
 (B_inv - pyqreg.c.blas_lapack.lapack_cholesky_inv(B.copy()) < 1e-6).all()
 from pyqreg.c.stats import invnormal, normalden
+```
+
+
+```{r}
+#| eval: false
+
+# library(quantreg)
+# library(tidyverse)
+# n0 = 30000
+# mu0 = 0.0
+# sd0 = 1.0
+# n1 = 31000
+# mu1 = 0.2
+# sd1 = 0.8
+
+# tau = 0.7
+
+# tq = qnorm(tau, mu1, sd1) - qnorm(tau, mu0, sd0)  # 真实的qte
+# y0 = rnorm(n0, mu0, sd0)
+# y1 = rnorm(n1, mu1, sd1) 
+
+# X = matrix(rep(c(1.0, 0.0, 1.0), c(n0 + n1, n0, n1)), ncol = 2)
+# y = matrix(c(y0, y1), ncol = 1)
+
+# data = tibble(
+#     x = rep(c(0.0, 1.0), c(n0, n1)),
+#     y = c(y0, y1)
+# )
+
+# mod = rq(y ~ x, tau, data)
+
+# object = mod
+# den = density(resid)
+# 1.0 / den$y[which.min(abs(den$x))]
+
 ```
