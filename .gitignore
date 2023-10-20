@@ -2,4 +2,5 @@
 /_site/
 /.luarc.json
 /_freeze/
+.DS_Store
 *.ipynb
