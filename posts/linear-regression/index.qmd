@@ -1,0 +1,43 @@
+---
+title: "a linear regression udaf on pyspark/spark"
+date: "2023-10-17"
+categories: [A/B test, least square regression]
+---
+
+在因果推断中，无论是实验数据(A/B test)还是观察性数据，线性回归都是非常重要且基础的模型。spark ml的glm([pyspark](https://spark.apache.org/docs/latest/ml-classification-regression.html#generalized-linear-regression))提供了类似于R的glm函数，可以在大规模数据集上运行，在这里，我们将对这个函数进行一些改进和扩展：
+
+- 支持group. 用户可以指定一些列进行分组拟合线性回归，这在ab实验后台中很常见：在一个数据集中，同时有多个实验的数据，我们对每个实验，分别进行回归，来评估实验结果
+
+- 支持各种类型的稳健/聚类稳健标准误
+
+- 支持[spark connect](https://spark.apache.org/docs/latest/spark-connect-overview.html)，spark ml后续不太有大的改进，spark connect可能是新的方向
+
+- 只支持线性回归。因为我们主要着眼于因果推断(A/B test)，线性回归是最核心的，这对性能也有一些帮助
+
+
+
+
+
+```{r}
+#| eval: false
+set.seed(0)
+n <- 1000
+p <- 5
+X <- cbind(1, matrix(rnorm(n * p), ncol = p))
+beta <- matrix(c(0.7, 0.4, 1.2, 0.2, 0.8, 0.5), ncol = 1)
+
+y <- X %*% beta + rnorm(n)
+
+df <- as.data.frame(cbind(y, X[, -1]))
+colnames(df) <- c("y", "x1", "x2", "x3", "x4", "x5")
+
+mod <- lm(y ~ ., df)
+inv_xtx <- solve(t(X) %*% X)
+hh <- diag(X %*% inv_xtx %*% t(X))
+print(all(abs(hh - hatvalues(mod)) < 1e-6))
+
+i <- 10
+X[i, , drop = FALSE] %*% inv_xtx %*% t(X[i, , drop = FALSE])
+hatvalues(mod)[i]
+```
+
