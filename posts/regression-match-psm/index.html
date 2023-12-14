@@ -7,9 +7,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="张振昊">
-<meta name="dcterms.date" content="2023-09-15">
+<meta name="dcterms.date" content="2023-09-25">
 
-<title>blog - Post With Live Code</title>
+<title>blog - 回归、匹配和psm</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -22,60 +22,7 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
-/* CSS for citations */
-div.csl-bib-body { }
-div.csl-entry {
-  clear: both;
-}
-.hanging-indent div.csl-entry {
-  margin-left:2em;
-  text-indent:-2em;
-}
-div.csl-left-margin {
-  min-width:2em;
-  float:left;
-}
-div.csl-right-inline {
-  margin-left:2em;
-  padding-left:1em;
-}
-div.csl-indent {
-  margin-left: 2em;
-}</style>
+</style>
 
 
 <script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
@@ -94,11 +41,6 @@ div.csl-indent {
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
-<meta name="shinylive:serviceworker_dir" content="../..">
-<script src="../../site_libs/quarto-contrib/shinylive-0.2.3/shinylive/load-shinylive-sw.js" type="module"></script>
-<script src="../../site_libs/quarto-contrib/shinylive-0.2.3/shinylive/run-python-blocks.js" type="module"></script>
-<link href="../../site_libs/quarto-contrib/shinylive-0.2.3/shinylive/shinylive.css" rel="stylesheet">
-<link href="../../site_libs/quarto-contrib/shinylive-quarto-css/shinylive-quarto.css" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -166,10 +108,9 @@ div.csl-indent {
 <header id="title-block-header" class="quarto-title-block default page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
-      <h1 class="title">Post With Live Code</h1>
+      <h1 class="title">回归、匹配和psm</h1>
                                 <div class="quarto-categories">
-                <div class="quarto-category">shinylive</div>
-                <div class="quarto-category">quarto</div>
+                <div class="quarto-category">causal inference</div>
               </div>
                   </div>
   </div>
@@ -187,7 +128,7 @@ div.csl-indent {
       <div>
       <div class="quarto-title-meta-heading">Published</div>
       <div class="quarto-title-meta-contents">
-        <p class="date">September 15, 2023</p>
+        <p class="date">September 25, 2023</p>
       </div>
     </div>
     
@@ -200,103 +141,64 @@ div.csl-indent {
 <!-- margin-sidebar -->
     
 <!-- main -->
-<main class="content quarto-banner-title-block page-columns page-full" id="quarto-document-content">
+<main class="content quarto-banner-title-block" id="quarto-document-content">
 
 
 
 
-<section id="setup" class="level1">
-<h1>setup</h1>
-<div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> pip install shinylive</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">quarto</span> add quarto-ext/shinylive</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">quarto</span> install tinytex <span class="co"># pdf</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</section>
-<section id="shinylive-demo" class="level1 page-columns page-full">
-<h1>shinylive-demo</h1>
-<p>The plot below allows you to control parameters used in the sine function. Experiment with the <em>period</em>, <em>amplitude</em>, and <em>phase shift</em> to see how they affect the graph.</p>
-<pre class="shinylive-python" data-engine="python"><code>#| standalone: true
-#| viewerHeight: 420
-
-from shiny import App, render, ui
-import numpy as np
-import matplotlib.pyplot as plt
-
-app_ui = ui.page_fluid(
-    ui.layout_sidebar(
-        ui.panel_sidebar(
-            ui.input_slider("period", "Period", 0.5, 2, 1, step=0.5),
-            ui.input_slider("amplitude", "Amplitude", 0, 2, 1, step=0.25),
-            ui.input_slider("shift", "Phase shift", 0, 2, 0, step=0.1),
-        ),
-        ui.panel_main(
-            ui.output_plot("plot"),
-        ),
-    ),
-)
-
-
-def server(input, output, session):
-    @output
-    @render.plot(alt="Sine function")
-    def plot():
-        t = np.arange(0.0, 4.0, 0.01)
-        s = input.amplitude() * np.sin(
-            (2 * np.pi / input.period()) * (t - input.shift() / 2)
-        )
-        fig, ax = plt.subplots()
-        ax.set_ylim([-2, 2])
-        ax.plot(t, s)
-        ax.grid()
-
-
-app = App(app_ui, server)
-</code></pre>
-<p>The components below don’t contain Shiny applications, but they do use Shinylive to load Pyodide and run Python code in the browser.</p>
-<p>Please note that these are experimental and usage may change in the future.</p>
-<section id="editor-and-terminal" class="level3 page-columns page-full">
-<h3 class="anchored" data-anchor-id="editor-and-terminal">Editor and terminal</h3>
-<p>Run selected code or current line with ⌘/Ctrl-Enter; run the entire file with ⌘/Ctrl-Shift-Enter.</p>
-<div class="column-page-inset-right">
-<pre class="shinylive-python" data-engine="python"><code>#| components: [editor, terminal]
-
-def add(a, b):
-    return a + b
-
-sums = map(add, [1, 2, 3], [4, 5, 6])
-list(sums)
-</code></pre>
-</div>
-</section>
-<section id="notebook-style-cell" class="level3">
-<h3 class="anchored" data-anchor-id="notebook-style-cell">Notebook-style cell</h3>
-<pre class="shinylive-python" data-engine="python"><code>#| components: [editor, cell]
-def add(a, b):
-    return a + b
-
-list(map(add, [2, 3], [4, 5]))</code></pre>
-<p>use a GitHub Action to automatically render book need tinytex</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="st">'renv'</span>)</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>renv<span class="sc">::</span><span class="fu">init</span>()</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="st">'tinytex'</span>)</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>tinytex<span class="sc">::</span><span class="fu">install_tinytex</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>对pdf, 单行公式$$直接不要有空格</p>
-</section>
-<section id="参考文献引用" class="level2">
-<h2 class="anchored" data-anchor-id="参考文献引用">参考文献引用</h2>
-<p>引用 <span class="citation" data-cites="liu2019large">Liu et al. (<a href="#ref-liu2019large" role="doc-biblioref">2019</a>)</span> 的文章</p>
-<section id="references" class="level3">
-<h3 class="anchored" data-anchor-id="references">References</h3>
-<div id="refs" class="references csl-bib-body hanging-indent" role="list">
-<div id="ref-liu2019large" class="csl-entry" role="listitem">
-Liu, Min, Xiaohui Sun, Maneesh Varshney, and Ya Xu. 2019. <span>“Large-Scale Online Experimentation with Quantile Metrics.”</span> <em>arXiv Preprint arXiv:1903.08762</em>.
-</div>
-</div>
+<p>回归、匹配和psm主要用于观察性数据的因果推断。我们关心的是，某个操作，比如是否发券、是否参加培训、是否使用某项药物/化妆品（这里都是二分的，只有是和否两个选项）。</p>
+<p>比如，我们想知道使用化妆品是否能改善皮肤状态。</p>
+<ul>
+<li><p>如果有A/B实验，直接用 「使用化妆品的群体的皮肤的平均值 - 使用化妆品的群体的皮肤的平均值」，就可以衡量化妆品的效果了。</p></li>
+<li><p>如果没有做实验，在观察性数据里， 「使用化妆品的群体的皮肤的平均值 - 使用化妆品的群体的皮肤的平均值」不能代表「化妆品的效果」，因为</p>
+<ul>
+<li><p>经济条件比较好的群体，或者生活习惯更健康的群体的皮肤状态更好（除「是否使用化妆品」之外的其他变量X，但会影响y)</p></li>
+<li><p>经济条件比较好的群体，或者生活习惯更健康的群体更可能使用化妆品（这就是倾向性得分，个体属于实验组/处理组的概率）</p></li>
+</ul></li>
+<li><p>回归、匹配和psm都可以解决这个问题</p>
+<ul>
+<li><p>回归： Y皮肤状态 ~ 是否使用化妆品 + 经济条件 + 生活习惯， 是否使用化妆品的系数就是控制了经济条件 + 生活习惯的差异后，使用化妆品对皮肤的影响</p></li>
+<li><p>匹配：</p>
+<ul>
+<li><p>把人群按「经济条件 + 生活习惯」分层，</p></li>
+<li><p>在每个层内，计算 层内处理效应 = 「使用化妆品的群体的皮肤的平均值 - 使用化妆品的群体的皮肤的平均值」</p></li>
+<li><p>整体处理效应 = 每个层的占比 * 层内处理效应</p></li>
+<li><p>匹配的优势：直接 + 易于理解/实现 + 容易检查实验组对照组是否同质</p></li>
+<li><p>如果有很多个控制变量，层可能会太多，可以做近似匹配</p>
+<ul>
+<li>对处理组的每个个体，考虑控制变量x0, x1, x2, … xm</li>
+<li>在控制组中，找最接近的个体。最接近用距离来衡量，
+<ul>
+<li>欧式距离：比如(x0‘ - x0) ** 2 + (x1‘ - x1) ** 2 + …</li>
+<li>马氏距离：标准化后再算距离</li>
+</ul></li>
+</ul></li>
+</ul></li>
+<li><p>psm:</p>
+<ul>
+<li>用控制变量预测是否使用化妆品， 是否使用化妆品 ～ 经济条件 + 生活习惯，得到每个用户使用化妆品的概率ps</li>
+<li>直接用psm加权
+<ul>
+<li>对每个个体</li>
+<li>如果是处理组，Y / ps, 如果是对照组 Y / (1 - ps)</li>
+<li>求平均，就是使用化妆品的处理效应</li>
+</ul></li>
+<li>或者psm + 匹配法（更常见）
+<ul>
+<li>按ps排序后，分层n个层</li>
+<li>在每个层内，计算 层内处理效应 = 「使用化妆品的群体的皮肤的平均值 - 使用化妆品的群体的皮肤的平均值」</li>
+<li>整体处理效应 = 每个层的占比 * 层内处理效应</li>
+</ul></li>
+<li>psm相对于回归的优势
+<ul>
+<li>对控制变量降维，比多个控制变量变成了单一的倾向性得分ps</li>
+<li>避免在回归中，通过添加/移除控制变量来操纵结论，因为psm是对「是否是处理组」回归的, 而不是直接对y回归</li>
+</ul></li>
+</ul></li>
+</ul></li>
+</ul>
 
 
-</section>
-</section>
-</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">

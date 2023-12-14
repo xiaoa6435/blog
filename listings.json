@@ -2,6 +2,10 @@
   {
     "listing": "/index.html",
     "items": [
+      "/posts/variance-reduction/index.html",
+      "/posts/extend-spark/index.html",
+      "/posts/linear-regression/index.html",
+      "/posts/regression-match-psm/index.html",
       "/posts/规划的系列文章.html",
       "/posts/minimum-sample-size/index.html",
       "/posts/switchback-experiment/index.html",

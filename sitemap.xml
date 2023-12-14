@@ -2,34 +2,50 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://xiaoa6435.github.io/blog/about.html</loc>
-    <lastmod>2023-09-24T10:28:30.654Z</lastmod>
+    <lastmod>2023-12-14T10:39:08.995Z</lastmod>
   </url>
   <url>
-    <loc>https://xiaoa6435.github.io/blog/posts/quantile-ab-test/quantile-regression.html</loc>
-    <lastmod>2023-09-24T10:28:29.485Z</lastmod>
-  </url>
-  <url>
-    <loc>https://xiaoa6435.github.io/blog/posts/switchback-experiment/index.html</loc>
-    <lastmod>2023-09-24T10:28:27.913Z</lastmod>
-  </url>
-  <url>
-    <loc>https://xiaoa6435.github.io/blog/posts/minimum-sample-size/index.html</loc>
-    <lastmod>2023-09-24T10:28:22.508Z</lastmod>
-  </url>
-  <url>
-    <loc>https://xiaoa6435.github.io/blog/posts/规划的系列文章.html</loc>
-    <lastmod>2023-09-24T10:28:21.907Z</lastmod>
-  </url>
-  <url>
-    <loc>https://xiaoa6435.github.io/blog/posts/post-with-online-code/index.html</loc>
-    <lastmod>2023-09-24T10:28:24.812Z</lastmod>
+    <loc>https://xiaoa6435.github.io/blog/posts/variance-reduction/index.html</loc>
+    <lastmod>2023-12-14T10:39:07.952Z</lastmod>
   </url>
   <url>
     <loc>https://xiaoa6435.github.io/blog/posts/quantile-ab-test/index.html</loc>
-    <lastmod>2023-09-24T10:28:28.725Z</lastmod>
+    <lastmod>2023-12-14T10:39:07.362Z</lastmod>
+  </url>
+  <url>
+    <loc>https://xiaoa6435.github.io/blog/posts/switchback-experiment/index.html</loc>
+    <lastmod>2023-12-14T10:39:06.542Z</lastmod>
+  </url>
+  <url>
+    <loc>https://xiaoa6435.github.io/blog/posts/post-with-online-code/index.html</loc>
+    <lastmod>2023-12-14T10:39:02.558Z</lastmod>
+  </url>
+  <url>
+    <loc>https://xiaoa6435.github.io/blog/posts/regression-match-psm/index.html</loc>
+    <lastmod>2023-12-14T10:37:56.264Z</lastmod>
+  </url>
+  <url>
+    <loc>https://xiaoa6435.github.io/blog/posts/规划的系列文章.html</loc>
+    <lastmod>2023-12-14T10:37:55.954Z</lastmod>
+  </url>
+  <url>
+    <loc>https://xiaoa6435.github.io/blog/posts/minimum-sample-size/index.html</loc>
+    <lastmod>2023-12-14T10:37:56.557Z</lastmod>
+  </url>
+  <url>
+    <loc>https://xiaoa6435.github.io/blog/posts/linear-regression/index.html</loc>
+    <lastmod>2023-12-14T10:39:03.510Z</lastmod>
+  </url>
+  <url>
+    <loc>https://xiaoa6435.github.io/blog/posts/extend-spark/index.html</loc>
+    <lastmod>2023-12-14T10:39:06.805Z</lastmod>
+  </url>
+  <url>
+    <loc>https://xiaoa6435.github.io/blog/posts/quantile-ab-test/quantile-regression.html</loc>
+    <lastmod>2023-12-14T10:39:07.700Z</lastmod>
   </url>
   <url>
     <loc>https://xiaoa6435.github.io/blog/index.html</loc>
-    <lastmod>2023-09-24T10:28:30.328Z</lastmod>
+    <lastmod>2023-12-14T10:39:08.722Z</lastmod>
   </url>
 </urlset>
