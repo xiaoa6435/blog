@@ -1,3 +1,13 @@
+---
+title: "A/B testing计算器"
+format: html
+filters:
+  - shinylive
+---
+
+### p值 & 胜率
+
+```{shinylive-python}
 #| standalone: true
 #| viewerHeight: 820
 
@@ -148,3 +158,4 @@ def server(input, output, session):
     #       ui.update_numeric("var0", value=p * (1.0 - p))
 
 app = App(app_ui, server)
+```
